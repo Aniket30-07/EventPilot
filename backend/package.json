@@ -1,0 +1,31 @@
+{
+  "name": "eventpilot-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "EventPilot Backend API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed:organizer": "node src/scripts/seedOrganizer.js",
+    "seed:events": "node src/scripts/seedEvents.js",
+    "test:phase1": "node src/scripts/testPhase1.js",
+    "test:phase2": "node src/scripts/testPhase2.js",
+    "test:phase3": "node src/scripts/testPhase3.js",
+    "test:phase4": "node src/scripts/testPhase4.js",
+    "test:phase5": "node src/scripts/testPhase5E2E.js",
+    "test:security": "node src/scripts/testSecurityFixes.js",
+    "test:all": "node src/scripts/testPhase1.js && node src/scripts/testPhase2.js && node src/scripts/testPhase3.js && node src/scripts/testPhase4.js && node src/scripts/testPhase5E2E.js && node src/scripts/testSecurityFixes.js",
+    "test": "npm run test:all"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.9.5",
+    "nodemon": "^3.1.14"
+  }
+}
