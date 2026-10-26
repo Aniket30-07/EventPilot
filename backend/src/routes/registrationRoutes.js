@@ -1,13 +1,15 @@
 import express from 'express';
-import {
-  cancelRegistration,
-  getMyRegistrations,
-} from '../controllers/registrationController.js';
-import { authenticate } from '../middleware/auth.js';
+import mongoose from 'mongoose';
+import { cancelRegistration } from '../controllers/registrationController.js';
+import { authenticate, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Cancel own registration
-router.post('/:registrationId/cancel', authenticate, cancelRegistration);
+router.param('registrationId', (req, res, next, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'Invalid registration ID.' });
+  next();
+});
+
+router.post('/:registrationId/cancel', authenticate, authorizeRoles('participant'), cancelRegistration);
 
 export default router;

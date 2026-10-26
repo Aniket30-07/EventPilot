@@ -1,145 +1,111 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+import { api } from '../lib/api';
+import { categoryLabel, fmtDate } from '../lib/format';
 
 export const ParticipantDashboard = () => {
   const { user } = useAuth();
-  const [roleTestResult, setRoleTestResult] = useState(null);
-  const [testing, setTesting] = useState(false);
+  const [regs, setRegs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  const testOrganizerAccess = async () => {
-    setTesting(true);
-    setRoleTestResult(null);
+  const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/organizer-only`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      setRoleTestResult({
-        status: res.status,
-        ok: res.ok,
-        data,
-      });
-    } catch (err) {
-      setRoleTestResult({ status: 500, ok: false, error: err.message });
+      setRegs((await api('/me/registrations')).registrations);
+      setError('');
+    } catch (e) {
+      setError(e.message);
     } finally {
-      setTesting(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const cancel = async (reg) => {
+    if (!window.confirm(`Cancel your registration for "${reg.eventId.title}"? You cannot re-register afterwards.`)) return;
+    setBusyId(reg._id);
+    setFeedback(null);
+    try {
+      await api(`/registrations/${reg._id}/cancel`, { method: 'POST' });
+      setFeedback({ type: 'success', message: 'Registration cancelled.' });
+      await load();
+    } catch (e) {
+      setFeedback({ type: 'error', message: e.message });
+    } finally {
+      setBusyId(null);
     }
   };
 
+  if (loading) return <p className="state">Loading your tickets…</p>;
+
+  const now = new Date();
+  const active = regs.filter((r) => r.status === 'confirmed');
+  const upcoming = active.filter((r) => new Date(r.eventId.endAt) >= now).length;
+  const attended = active.filter((r) => r.checkedInAt).length;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div className="hero-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <span className="phase-tag" style={{ color: '#38bdf8' }}>Participant Portal</span>
-            <h1 className="hero-title" style={{ marginTop: '0.4rem', fontSize: '1.9rem' }}>
-              Welcome, {user?.name}!
-            </h1>
-            <p className="hero-desc">
-              Your participant account is authenticated and active.
-            </p>
-          </div>
-          <span
-            className="status-indicator connected"
-            style={{ fontSize: '0.85rem' }}
-          >
-            Role: {user?.role}
-          </span>
-        </div>
+    <>
+      <h1>Welcome, {user.name}</h1>
+
+      <div className="grid small">
+        <div className="stat big"><span className="label">Upcoming events</span>{upcoming}</div>
+        <div className="stat big"><span className="label">Attended</span>{attended}</div>
+        <div className="stat big"><span className="label">Cancelled</span>{regs.length - active.length}</div>
       </div>
 
-      {/* User Information & Role Enforcement Test */}
-      <div className="status-grid">
-        <div className="status-card">
-          <span className="status-label">Profile Details</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Name</span>
-              <div style={{ fontWeight: 600 }}>{user?.name}</div>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Email</span>
-              <div style={{ fontWeight: 600 }}>{user?.email}</div>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>User ID</span>
-              <div className="status-meta">{user?._id || user?.id}</div>
-            </div>
-          </div>
+      {error && <div className="alert error">{error} <button className="link" onClick={load}>Retry</button></div>}
+      {feedback && <div className={`alert ${feedback.type}`}>{feedback.message}</div>}
+
+      <div className="row spread">
+        <h2>My tickets</h2>
+        <Link to="/events" className="btn ghost sm">Browse events</Link>
+      </div>
+
+      {!error && regs.length === 0 && (
+        <div className="card center">
+          <p className="muted">You haven't registered for any events yet.</p>
+          <Link to="/events" className="btn">Find an event</Link>
         </div>
+      )}
 
-        {/* Server-Side Authorization Boundary Test */}
-        <div className="status-card">
-          <span className="status-label">Security & Role Check</span>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Verify server-side authorization: Try calling an Organizer-only protected endpoint from your Participant session.
-          </p>
-          <button
-            onClick={testOrganizerAccess}
-            disabled={testing}
-            className="btn-primary"
-            style={{
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#f87171',
-              boxShadow: 'none',
-              width: 'fit-content',
-            }}
-            id="test-organizer-auth-btn"
-          >
-            {testing ? 'Testing...' : 'Test Organizer API Access'}
-          </button>
-
-          {roleTestResult && (
-            <div
-              style={{
-                marginTop: '0.5rem',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                background: roleTestResult.status === 403 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                border: `1px solid ${roleTestResult.status === 403 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                fontSize: '0.8rem',
-              }}
-              id="role-test-result"
-            >
-              <div style={{ fontWeight: 700, color: roleTestResult.status === 403 ? '#fbbf24' : '#f87171' }}>
-                HTTP Status: {roleTestResult.status} {roleTestResult.status === 403 && '(Expected: 403 Forbidden)'}
+      {regs.map((r) => {
+        const ev = r.eventId;
+        const confirmed = r.status === 'confirmed';
+        const started = new Date() >= new Date(ev.startAt);
+        const canCancel = confirmed && !r.checkedInAt && !started && ev.status !== 'cancelled';
+        return (
+          <div key={r._id} className={`card event-row ${confirmed ? '' : 'faded'}`}>
+            <div className="grow">
+              <div className="row">
+                {!confirmed ? <span className="pill cancelled">Registration cancelled</span>
+                  : r.checkedInAt ? <span className="pill ok">Checked in</span>
+                  : <span className="pill">Registered</span>}
+                {ev.status === 'cancelled' && <span className="pill cancelled">Event cancelled</span>}
               </div>
-              <div style={{ marginTop: '0.25rem', color: 'var(--text-muted)' }}>
-                {roleTestResult.data?.message || roleTestResult.error}
-              </div>
+              <h3><Link to={`/events/${ev._id}`}>{ev.title}</Link></h3>
+              <p className="muted">
+                {categoryLabel(ev.category)} · {fmtDate(ev.startAt)} · {ev.mode === 'online' ? 'Online' : ev.venue}
+              </p>
+              {confirmed && ev.mode === 'online' && ev.onlineLink && (
+                <a href={ev.onlineLink} target="_blank" rel="noopener noreferrer">Join link</a>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Phase 3 Active: My Tickets Banner */}
-      <div className="hero-card" style={{ padding: '1.75rem', borderLeft: '4px solid #38bdf8' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <span className="phase-tag" style={{ color: '#38bdf8' }}>Active Feature • Phase 3</span>
-            <h3 style={{ fontSize: '1.25rem', marginTop: '0.35rem', marginBottom: '0.4rem' }}>
-              My Tickets & Registrations
-            </h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '600px' }}>
-              Manage your confirmed event registrations, view your human-readable ticket reference codes, or release seats via cancellation.
-            </p>
+            <div className="ticket-side">
+              <span className="label">Ticket</span>
+              <div className="ticket-code">{r.ticketCode}</div>
+              {canCancel && (
+                <button className="btn danger sm" disabled={busyId === r._id} onClick={() => cancel(r)}>
+                  {busyId === r._id ? 'Cancelling…' : 'Cancel'}
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <Link to="/my-registrations" className="btn-primary" id="dashboard-my-tickets-btn">
-              🎟️ View My Tickets
-            </Link>
-            <Link to="/events" className="btn-primary" style={{ background: 'rgba(255, 255, 255, 0.08)', boxShadow: 'none' }}>
-              Browse Events
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+        );
+      })}
+    </>
   );
 };

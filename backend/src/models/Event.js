@@ -113,7 +113,6 @@ const eventSchema = new mongoose.Schema(
 
 // Indexes for public discovery queries
 eventSchema.index({ status: 1, category: 1, startAt: 1 });
-eventSchema.index({ title: 'text', description: 'text' });
 
 const Event = mongoose.model('Event', eventSchema);
 

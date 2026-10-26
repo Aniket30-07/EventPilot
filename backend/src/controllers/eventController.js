@@ -1,341 +1,212 @@
-import mongoose from 'mongoose';
 import Event, { EVENT_CATEGORIES } from '../models/Event.js';
+import Registration from '../models/Registration.js';
+import { getEventMetrics, shapeMetrics } from '../utils/metrics.js';
 
-// GET /api/events - Public discovery of published events
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isOwner = (event, user) => Boolean(user && event.organizerId.equals(user._id));
+const fail = (res, status, message) => res.status(status).json({ success: false, message });
+
+const EDITABLE = ['title', 'description', 'category', 'startAt', 'endAt', 'mode', 'venue', 'onlineLink', 'capacity', 'registrationDeadline'];
+
+// Validates a full event object (merged existing + changes). Returns an error string or null.
+const validateEvent = (e, { requireFutureStart = false } = {}) => {
+  if (typeof e.title !== 'string' || e.title.trim().length < 3 || e.title.trim().length > 200) return 'Title must be 3–200 characters.';
+  if (typeof e.description !== 'string' || e.description.trim().length < 10) return 'Description must be at least 10 characters.';
+  if (!EVENT_CATEGORIES.includes(e.category)) return 'Please choose a valid category.';
+  if (!['online', 'in-person'].includes(e.mode)) return 'Mode must be online or in-person.';
+
+  const start = new Date(e.startAt), end = new Date(e.endAt), deadline = new Date(e.registrationDeadline);
+  if ([start, end, deadline].some((d) => isNaN(d.getTime()))) return 'Start, end and registration deadline must be valid dates.';
+  if (end <= start) return 'End time must be after the start time.';
+  if (deadline > start) return 'Registration deadline cannot be after the event start.';
+  if (requireFutureStart && start <= new Date()) return 'Start time must be in the future.';
+
+  if (!Number.isInteger(Number(e.capacity)) || Number(e.capacity) < 1 || Number(e.capacity) > 100000) return 'Capacity must be a whole number between 1 and 100000.';
+
+  if (e.mode === 'in-person' && !(typeof e.venue === 'string' && e.venue.trim())) return 'Venue is required for in-person events.';
+  if (e.mode === 'online') {
+    try {
+      const u = new URL(e.onlineLink);
+      if (!['http:', 'https:'].includes(u.protocol)) throw new Error();
+    } catch {
+      return 'A valid meeting link (http/https) is required for online events.';
+    }
+  }
+  return null;
+};
+
+const loadOwnedEvent = async (req, res) => {
+  const event = await Event.findById(req.params.eventId);
+  if (!event) { fail(res, 404, 'Event not found.'); return null; }
+  if (!isOwner(event, req.user)) { fail(res, 403, 'You do not own this event.'); return null; }
+  return event;
+};
+
+// GET /api/events — published, not-yet-ended events only
 export const getPublishedEvents = async (req, res, next) => {
   try {
     const { q, category, mode, sort } = req.query;
+    const filter = { status: 'published', endAt: { $gte: new Date() } };
 
-    const filter = { status: 'published' };
-
-    // Category filter
-    if (category && category !== 'all') {
-      if (EVENT_CATEGORIES.includes(category)) {
-        filter.category = category;
-      }
-    }
-
-    // Mode filter
-    if (mode && ['online', 'in-person'].includes(mode)) {
-      filter.mode = mode;
-    }
-
-    // Text search filter
-    if (q && q.trim()) {
-      const regex = new RegExp(q.trim(), 'i');
+    if (typeof category === 'string' && EVENT_CATEGORIES.includes(category)) filter.category = category;
+    if (mode === 'online' || mode === 'in-person') filter.mode = mode;
+    if (typeof q === 'string' && q.trim()) {
+      const regex = new RegExp(escapeRegex(q.trim().slice(0, 100)), 'i');
       filter.$or = [{ title: regex }, { description: regex }];
     }
 
-    // Sorting
-    let sortOption = { startAt: 1 }; // Default: upcoming soonest
-    if (sort === 'latest') {
-      sortOption = { createdAt: -1 };
-    } else if (sort === 'capacity') {
-      sortOption = { capacity: -1 };
-    }
+    const sortOption = sort === 'latest' ? { createdAt: -1 } : { startAt: 1 };
+    const events = await Event.find(filter).sort(sortOption).populate('organizerId', 'name').select('-onlineLink').lean();
+    const metrics = await getEventMetrics(events.map((e) => e._id));
 
-    const events = await Event.find(filter)
-      .sort(sortOption)
-      .populate('organizerId', 'name email');
-
-    return res.status(200).json({
-      success: true,
-      count: events.length,
-      events,
+    const result = events.map((e) => {
+      const m = shapeMetrics(metrics.get(e._id.toString()), e.capacity);
+      return { ...e, confirmedCount: m.confirmedCount, remainingSeats: m.remainingSeats };
     });
+    res.status(200).json({ success: true, count: result.length, events: result });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
-// GET /api/events/:eventId - Event details (public if published; owner-only if draft/cancelled)
+// GET /api/events/:eventId — published (public) or any status (owner)
 export const getEventById = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    const event = await Event.findById(req.params.eventId).populate('organizerId', 'name');
+    if (!event) return fail(res, 404, 'Event not found.');
 
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid event ID format.',
-      });
+    const owner = Boolean(req.user && event.organizerId._id.equals(req.user._id));
+    if (event.status !== 'published' && !owner) return fail(res, 404, 'Event not found.');
+
+    const obj = event.toObject();
+    const m = shapeMetrics((await getEventMetrics([event._id])).get(event._id.toString()), event.capacity);
+    obj.confirmedCount = m.confirmedCount;
+    obj.remainingSeats = m.remainingSeats;
+
+    let myRegistration = null;
+    if (req.user?.role === 'participant') {
+      myRegistration = await Registration.findOne({ eventId: event._id, participantId: req.user._id });
     }
+    // The private meeting link is only shown to the owner and to confirmed registrants.
+    if (!owner && myRegistration?.status !== 'confirmed') delete obj.onlineLink;
 
-    const event = await Event.findById(eventId).populate('organizerId', 'name email');
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found.',
-      });
-    }
-
-    // If event is not published, only the event owner can view it
-    if (event.status !== 'published') {
-      const isOwner = req.user && event.organizerId._id.equals(req.user._id);
-      if (!isOwner) {
-        return res.status(404).json({
-          success: false,
-          message: 'Event not found or not published.',
-        });
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      event,
-    });
+    res.status(200).json({ success: true, event: obj, isOwner: owner, myRegistration });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
-// GET /api/events/mine - List all events owned by current organizer
-export const getMyEvents = async (req, res, next) => {
-  try {
-    const events = await Event.find({ organizerId: req.user._id }).sort({ createdAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      count: events.length,
-      events,
-    });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-// POST /api/events - Create new event (Organizer only)
+// POST /api/events — always creates a draft
 export const createEvent = async (req, res, next) => {
   try {
-    const {
-      title,
-      description,
-      category,
-      startAt,
-      endAt,
-      mode,
-      venue,
-      onlineLink,
-      capacity,
-      registrationDeadline,
-      status,
-    } = req.body;
-
-    // Date validations
-    const startDate = new Date(startAt);
-    const endDate = new Date(endAt);
-    const deadlineDate = new Date(registrationDeadline);
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || isNaN(deadlineDate.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid date format provided for startAt, endAt, or registrationDeadline.',
-      });
-    }
-
-    if (endDate <= startDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date/time must be strictly after the start date/time.',
-      });
-    }
-
-    if (deadlineDate > startDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Registration deadline cannot be after the event start time.',
-      });
-    }
+    const body = req.body || {};
+    const data = Object.fromEntries(EDITABLE.map((k) => [k, body[k]]));
+    const err = validateEvent(data, { requireFutureStart: true });
+    if (err) return fail(res, 400, err);
 
     const event = await Event.create({
-      title,
-      description,
-      category,
-      startAt: startDate,
-      endAt: endDate,
-      mode,
-      venue: mode === 'in-person' ? venue : '',
-      onlineLink: mode === 'online' ? onlineLink : '',
-      capacity,
-      registrationDeadline: deadlineDate,
+      ...data,
+      title: data.title.trim(),
+      description: data.description.trim(),
+      capacity: Number(data.capacity),
+      venue: data.mode === 'in-person' ? data.venue.trim() : '',
+      onlineLink: data.mode === 'online' ? data.onlineLink.trim() : '',
       organizerId: req.user._id,
-      status: ['draft', 'published'].includes(status) ? status : 'draft',
+      status: 'draft',
     });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Event created successfully.',
-      event,
-    });
+    res.status(201).json({ success: true, message: 'Event saved as draft.', event });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({
-        success: false,
-        message: messages.join(', '),
-      });
-    }
-    return next(error);
+    next(error);
   }
 };
 
-// PATCH /api/events/:eventId - Edit event (Owner only)
+// PATCH /api/events/:eventId
 export const updateEvent = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
+    const event = await loadOwnedEvent(req, res);
+    if (!event) return;
+    if (['cancelled', 'completed'].includes(event.status)) return fail(res, 400, `A ${event.status} event cannot be edited.`);
 
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({ success: false, message: 'Invalid event ID.' });
+    const merged = Object.fromEntries(EDITABLE.map((k) => [k, req.body?.[k] !== undefined ? req.body[k] : event[k]]));
+    const err = validateEvent(merged, { requireFutureStart: req.body?.startAt !== undefined });
+    if (err) return fail(res, 400, err);
+
+    const { confirmed } = (await getEventMetrics([event._id])).get(event._id.toString());
+    if (Number(merged.capacity) < confirmed) {
+      return fail(res, 400, `Capacity cannot be lower than the ${confirmed} confirmed registrations.`);
     }
 
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found.' });
-    }
-
-    // Strict ownership verification on server
-    if (!event.organizerId.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: You are not authorized to edit this event.',
-      });
-    }
-
-    if (event.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cancelled events cannot be modified.',
-      });
-    }
-
-    const allowedUpdates = [
-      'title',
-      'description',
-      'category',
-      'startAt',
-      'endAt',
-      'mode',
-      'venue',
-      'onlineLink',
-      'capacity',
-      'registrationDeadline',
-    ];
-
-    const updates = {};
-    for (const key of allowedUpdates) {
-      if (req.body[key] !== undefined) {
-        updates[key] = req.body[key];
-      }
-    }
-
-    // Validate revised dates if changed
-    const targetStart = updates.startAt ? new Date(updates.startAt) : event.startAt;
-    const targetEnd = updates.endAt ? new Date(updates.endAt) : event.endAt;
-    const targetDeadline = updates.registrationDeadline ? new Date(updates.registrationDeadline) : event.registrationDeadline;
-
-    if (targetEnd <= targetStart) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date/time must be strictly after the start date/time.',
-      });
-    }
-
-    if (targetDeadline > targetStart) {
-      return res.status(400).json({
-        success: false,
-        message: 'Registration deadline cannot be after the event start time.',
-      });
-    }
-
-    Object.assign(event, updates);
-    await event.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Event updated successfully.',
-      event,
+    Object.assign(event, merged, {
+      title: merged.title.trim(),
+      description: merged.description.trim(),
+      capacity: Number(merged.capacity),
+      venue: merged.mode === 'in-person' ? merged.venue.trim() : '',
+      onlineLink: merged.mode === 'online' ? merged.onlineLink.trim() : '',
     });
+    await event.save();
+    res.status(200).json({ success: true, message: 'Event updated.', event });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({ success: false, message: messages.join(', ') });
-    }
-    return next(error);
+    next(error);
   }
 };
 
-// POST /api/events/:eventId/publish - Publish event (Owner only)
+// POST /api/events/:eventId/publish
 export const publishEvent = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({ success: false, message: 'Invalid event ID.' });
-    }
-
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found.' });
-    }
-
-    // Ownership check
-    if (!event.organizerId.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: You are not authorized to publish this event.',
-      });
-    }
-
-    if (event.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot publish a cancelled event.',
-      });
-    }
+    const event = await loadOwnedEvent(req, res);
+    if (!event) return;
+    if (event.status !== 'draft') return fail(res, 400, `Only draft events can be published (this one is ${event.status}).`);
+    if (event.endAt <= new Date()) return fail(res, 400, 'This event has already ended. Edit the dates before publishing.');
 
     event.status = 'published';
     await event.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Event published successfully and is now discoverable.',
-      event,
-    });
+    res.status(200).json({ success: true, message: 'Event published.', event });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
 
-// POST /api/events/:eventId/cancel - Cancel event (Owner only)
+// POST /api/events/:eventId/cancel
 export const cancelEvent = async (req, res, next) => {
   try {
-    const { eventId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({ success: false, message: 'Invalid event ID.' });
-    }
-
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found.' });
-    }
-
-    // Ownership check
-    if (!event.organizerId.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: You are not authorized to cancel this event.',
-      });
-    }
+    const event = await loadOwnedEvent(req, res);
+    if (!event) return;
+    if (event.status === 'cancelled') return fail(res, 400, 'This event is already cancelled.');
 
     event.status = 'cancelled';
     await event.save();
+    res.status(200).json({ success: true, message: 'Event cancelled.', event });
+  } catch (error) {
+    next(error);
+  }
+};
 
-    return res.status(200).json({
+// GET /api/events/mine/analytics — organizer dashboard (own events only)
+export const getOrganizerAnalytics = async (req, res, next) => {
+  try {
+    const events = await Event.find({ organizerId: req.user._id }).sort({ startAt: -1 }).lean();
+    const metrics = await getEventMetrics(events.map((e) => e._id));
+
+    const rows = events.map((e) => ({
+      _id: e._id, title: e.title, status: e.status, category: e.category, mode: e.mode,
+      startAt: e.startAt, endAt: e.endAt,
+      ...shapeMetrics(metrics.get(e._id.toString()), e.capacity),
+    }));
+
+    const confirmed = rows.reduce((s, r) => s + r.confirmedCount, 0);
+    const checkedIn = rows.reduce((s, r) => s + r.checkedInCount, 0);
+    res.status(200).json({
       success: true,
-      message: 'Event has been cancelled.',
-      event,
+      summary: {
+        totalEvents: rows.length,
+        publishedEvents: rows.filter((r) => r.status === 'published').length,
+        confirmedRegistrations: confirmed,
+        checkedInAttendees: checkedIn,
+        overallCheckInRate: confirmed > 0 ? Number(((checkedIn / confirmed) * 100).toFixed(1)) : 0,
+      },
+      events: rows,
     });
   } catch (error) {
-    return next(error);
+    next(error);
   }
 };
