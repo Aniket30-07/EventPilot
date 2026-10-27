@@ -9,6 +9,12 @@ const registrationSchema = new mongoose.Schema(
     registeredAt: { type: Date, default: Date.now },
     cancelledAt: { type: Date, default: null },
     checkedInAt: { type: Date, default: null },
+    teamName: { type: String, default: '', trim: true },
+    squadSize: { type: Number, default: 1 },
+    playerNotes: { type: String, default: '', trim: true },
+    isCaptain: { type: Boolean, default: false },
+    captainRegistrationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', default: null },
+    roleInTeam: { type: String, enum: ['solo', 'captain', 'player'], default: 'solo' },
   },
   { timestamps: true }
 );

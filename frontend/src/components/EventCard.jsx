@@ -16,6 +16,10 @@ export const EventCard = ({ event }) => {
   const capacity = Math.max(1, event.capacity || 1);
   const bookedPercent = Math.min(100, Math.round(((capacity - remaining) / capacity) * 100));
 
+  const isSports = event.category === 'sports';
+  const isChess = isSports && event.sportsData?.sportType === 'chess';
+  const unitLabel = isSports ? (isChess ? 'competitor' : 'team') : 'spot';
+
   return (
     <Link to={`/events/${event._id}`} className={`event-card event-art-${art.scene}`}>
       <div className="event-card-art">
@@ -33,7 +37,7 @@ export const EventCard = ({ event }) => {
         <div className="event-card-footer">
           <div className="seat-summary">
             <span className={remaining === 0 ? 'danger-text' : ''}>
-              {remaining === 0 ? 'Fully booked' : `${remaining} spots left`}
+              {remaining === 0 ? 'Tournament Full' : `${remaining} ${unitLabel}${remaining === 1 ? '' : 's'} left`}
             </span>
             <span className="seat-track" aria-hidden="true">
               <span style={{ width: `${bookedPercent}%` }} />

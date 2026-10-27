@@ -7,7 +7,8 @@ export const getEventMetrics = async (eventIds) => {
     {
       $group: {
         _id: { eventId: '$eventId', status: '$status' },
-        count: { $sum: 1 },
+        // Team players belong to an existing team slot and do not consume a separate team quota
+        count: { $sum: { $cond: [{ $eq: ['$roleInTeam', 'player'] }, 0, 1] } },
         checkedIn: { $sum: { $cond: [{ $gt: ['$checkedInAt', null] }, 1, 0] } },
       },
     },

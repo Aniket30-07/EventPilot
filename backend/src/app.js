@@ -5,18 +5,40 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/authRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import registrationRoutes from './routes/registrationRoutes.js';
+import teamRoutes from './routes/teamRoutes.js';
+import teamInviteRoutes from './routes/teamInviteRoutes.js';
 import { getMyRegistrations } from './controllers/registrationController.js';
 import { authenticate, authorizeRoles } from './middleware/auth.js';
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-const allowedOrigins = [process.env.FRONTEND_URL].filter(Boolean);
+const parseAllowedOrigins = () => {
+  const envVal = process.env.FRONTEND_URL || '';
+  return envVal
+    .split(',')
+    .map((s) => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+};
 
-const isAllowedOrigin = (origin) => (
-  allowedOrigins.includes(origin) ||
-  (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))
-);
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  const clean = origin.trim().replace(/\/+$/, '');
+  const allowed = parseAllowedOrigins();
+  if (allowed.includes(clean)) return true;
+  if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(clean)) {
+    return true;
+  }
+  // Allow Vercel preview and production deployments
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname.endsWith('.vercel.app')) return true;
+  } catch {
+    // ignore URL parse errors
+  }
+  return false;
+};
 
 app.use((req, res, next) => {
   res.set({
@@ -82,6 +104,8 @@ app.use('/api', (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/registrations', registrationRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api', teamInviteRoutes);
 app.get('/api/me/registrations', authenticate, authorizeRoles('participant'), getMyRegistrations);
 
 // 404 handler

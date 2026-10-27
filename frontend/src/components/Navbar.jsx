@@ -16,10 +16,12 @@ export const Navbar = () => {
       <nav>
         <NavLink to="/events">Discover</NavLink>
         {user?.role === 'participant' && <NavLink to="/participant">My tickets</NavLink>}
-        {user?.role === 'organizer' && <>
-          <NavLink to="/organizer">Your events</NavLink>
-          <NavLink to="/organizer/security">Security</NavLink>
-        </>}
+        {user?.role === 'organizer' && (
+          <>
+            <NavLink to="/organizer" end>Your events</NavLink>
+            <NavLink to="/organizer/team">Organizer Team</NavLink>
+          </>
+        )}
       </nav>
       <div className="nav-user">
         {user ? (

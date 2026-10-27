@@ -83,14 +83,45 @@ export const EventAttendees = () => {
       {feedback && <div className={`alert ${feedback.type}`}>{feedback.message}</div>}
       {!canCheckIn && <div className="alert info">Check-in is only available while the event is published.</div>}
 
-      <div className="filters">
-        <input placeholder="Search name, email or ticket…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="filters" style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+        <input placeholder="Search name, email or ticket…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1 }} />
         <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="all">All</option>
           <option value="pending">Not checked in</option>
           <option value="checkedIn">Checked in</option>
           <option value="cancelled">Cancelled</option>
         </select>
+        <button
+          className="btn ghost sm"
+          type="button"
+          onClick={() => {
+            const list = data?.attendees || [];
+            if (!list.length) return alert('No attendees to export.');
+            const headers = ['Ticket Code', 'Name', 'Email', 'Status', 'Registered At', 'Checked In At'];
+            const csvRows = [headers.join(',')];
+            for (const a of list) {
+              const row = [
+                `"${a.ticketCode || ''}"`,
+                `"${(a.participantId?.name || '').replace(/"/g, '""')}"`,
+                `"${(a.participantId?.email || '').replace(/"/g, '""')}"`,
+                `"${a.status || ''}"`,
+                `"${a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}"`,
+                `"${a.checkedInAt ? new Date(a.checkedInAt).toLocaleString() : 'No'}"`,
+              ];
+              csvRows.push(row.join(','));
+            }
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}_attendees.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+        >
+          📥 Export CSV
+        </button>
       </div>
 
       {rows.length === 0 ? (

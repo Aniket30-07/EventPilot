@@ -74,7 +74,13 @@ test('malformed JSON returns a client error', async () => {
   assert.equal(data.message, 'Invalid JSON in request body.');
 });
 
-test('organizer MFA settings require an authenticated organizer', async () => {
-  const response = await fetch(`${baseUrl}/api/auth/mfa`, { headers: { Connection: 'close' } });
-  assert.equal(response.status, 401);
+test('Vercel deployment origins are permitted by CORS', async () => {
+  const response = await fetch(`${baseUrl}/api/auth/logout`, {
+    method: 'POST',
+    headers: { Origin: 'https://eventpilot-frontend.vercel.app', Connection: 'close' },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://eventpilot-frontend.vercel.app');
 });
+

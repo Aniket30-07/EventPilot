@@ -10,7 +10,7 @@ const toLocalInput = (iso) => {
 };
 
 const EMPTY = {
-  title: '', description: '', category: 'hackathon', mode: 'in-person', venue: '', onlineLink: '',
+  title: '', description: '', category: 'hackathon', sportType: 'football', tournamentFormat: 'knockout_4', mode: 'in-person', venue: '', onlineLink: '',
   startAt: '', endAt: '', registrationDeadline: '', capacity: 50,
 };
 
@@ -34,6 +34,8 @@ export const EventForm = () => {
         setStatus(event.status);
         setForm({
           ...EMPTY, ...event,
+          sportType: event.sportsData?.sportType || 'football',
+          tournamentFormat: event.sportsData?.tournamentFormat || 'knockout_4',
           startAt: toLocalInput(event.startAt),
           endAt: toLocalInput(event.endAt),
           registrationDeadline: toLocalInput(event.registrationDeadline),
@@ -60,12 +62,20 @@ export const EventForm = () => {
 
     setBusy(true);
     try {
+      const isSports = form.category === 'sports';
       const body = {
         title: form.title, description: form.description, category: form.category, mode: form.mode,
         venue: form.venue, onlineLink: form.onlineLink, capacity: Number(form.capacity),
         startAt: new Date(form.startAt).toISOString(),
         endAt: new Date(form.endAt).toISOString(),
         registrationDeadline: new Date(form.registrationDeadline).toISOString(),
+        ...(isSports ? {
+          sportsData: {
+            sportType: form.sportType || 'football',
+            tournamentFormat: form.tournamentFormat || 'knockout_4',
+            maxTeams: Number(form.capacity),
+          },
+        } : {}),
       };
       const targetEventId = eventId || createdEventId;
       const res = targetEventId
@@ -87,6 +97,8 @@ export const EventForm = () => {
   }
 
   const isDraft = !editing || status === 'draft';
+  const isSports = form.category === 'sports';
+  const isChess = isSports && form.sportType === 'chess';
 
   return (
     <form className="card form narrow-wide" onSubmit={(e) => { e.preventDefault(); submit(false); }}>
@@ -98,7 +110,14 @@ export const EventForm = () => {
 
       <div className="two-col">
         <label>Category
-          <select value={form.category} onChange={set('category')}>
+          <select value={form.category} onChange={(e) => {
+            const cat = e.target.value;
+            setForm({
+              ...form,
+              category: cat,
+              capacity: cat === 'sports' ? 4 : form.capacity || 50,
+            });
+          }}>
             {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </label>
@@ -110,9 +129,38 @@ export const EventForm = () => {
         </label>
       </div>
 
+      {isSports && (
+        <div className="two-col">
+          <label>Sport Discipline
+            <select value={form.sportType} onChange={set('sportType')}>
+              <option value="football">⚽ Football / Soccer (11 v 11)</option>
+              <option value="cricket">🏏 Cricket (11 Playing XI + Squad of 15)</option>
+              <option value="chess">♟️ Chess (1 v 1 Swiss / Round Robin)</option>
+              <option value="general">🏆 General Sports Tournament</option>
+            </select>
+          </label>
+          <label>Tournament Bracket Format
+            <select
+              value={form.tournamentFormat}
+              onChange={(e) => {
+                const fmt = e.target.value;
+                const defCap = fmt === 'knockout_2' ? 2 : fmt === 'knockout_8' ? 8 : 4;
+                setForm({ ...form, tournamentFormat: fmt, capacity: defCap });
+              }}
+            >
+              <option value="knockout_4">🏆 4-Team Knockout (2 Semis ➔ 1 Grand Final)</option>
+              <option value="knockout_2">🏆 2-Team Championship Match (1v1 Final)</option>
+              <option value="knockout_8">🏆 8-Team Knockout (4 QFs ➔ 2 Semis ➔ Final)</option>
+              <option value="round_robin">🏆 Round-Robin League (Points Table)</option>
+              <option value="custom">🏆 Custom / Open Tournament</option>
+            </select>
+          </label>
+        </div>
+      )}
+
       {form.mode === 'in-person'
         ? <label>Venue<input required maxLength={300} value={form.venue} onChange={set('venue')} /></label>
-        : <label>Meeting link<input type="url" required maxLength={2048} placeholder="https://…" value={form.onlineLink} onChange={set('onlineLink')} /></label>}
+        : <label>Platform / Virtual Access Info<input maxLength={2048} placeholder="e.g. Zoom / Platform details (optional)" value={form.onlineLink} onChange={set('onlineLink')} /></label>}
 
       <div className="two-col">
         <label>Starts<input type="datetime-local" required value={form.startAt} onChange={set('startAt')} /></label>
@@ -120,7 +168,15 @@ export const EventForm = () => {
       </div>
       <div className="two-col">
         <label>Registration deadline<input type="datetime-local" required value={form.registrationDeadline} onChange={set('registrationDeadline')} /></label>
-        <label>Capacity<input type="number" required min={1} max={100000} step={1} value={form.capacity} onChange={set('capacity')} /></label>
+        <label>
+          {isSports ? (isChess ? 'Max Players (1v1 Competitor Limit)' : 'Max Teams (Tournament Slot Limit)') : 'Capacity (Seats / Tickets)'}
+          <input type="number" required min={1} max={100000} step={1} value={form.capacity} onChange={set('capacity')} />
+          {isSports && (
+            <span style={{ fontSize: '.76rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
+              Each registration takes 1 {isChess ? 'player' : 'team'} slot. Registration closes once limit is reached.
+            </span>
+          )}
+        </label>
       </div>
 
       <div className="row">

@@ -7,6 +7,7 @@ const loadUser = async (req) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
   const user = await User.findById(decoded.id);
   if (!user || (decoded.version || 0) !== (user.authTokenVersion || 0)) return null;
+  if (user.status === 'suspended') return null;
   return user;
 };
 

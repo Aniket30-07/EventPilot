@@ -108,6 +108,56 @@ const eventSchema = new mongoose.Schema(
       default: 'draft',
       index: true,
     },
+    resultsPublished: {
+      type: Boolean,
+      default: false,
+    },
+    recap: {
+      summary: { type: String, default: '', maxlength: 5000 },
+      keyTakeaways: { type: [String], default: [] },
+      recordingUrl: { type: String, default: '', maxlength: 2048 },
+      slidesUrl: { type: String, default: '', maxlength: 2048 },
+      publishedAt: { type: Date, default: null },
+    },
+    sportsData: {
+      sportType: {
+        type: String,
+        enum: ['football', 'cricket', 'chess', 'general'],
+        default: 'football',
+      },
+      tournamentFormat: {
+        type: String,
+        enum: ['knockout_2', 'knockout_4', 'knockout_8', 'round_robin', 'custom'],
+        default: 'knockout_4',
+      },
+      maxTeams: {
+        type: Number,
+        default: 4,
+      },
+      matches: [
+        {
+          round: { type: String, default: 'Match 1' },
+          teamA: { type: String, required: true },
+          teamB: { type: String, required: true },
+          scoreA: { type: String, default: '-' },
+          scoreB: { type: String, default: '-' },
+          status: { type: String, enum: ['scheduled', 'live', 'completed'], default: 'scheduled' },
+          winner: { type: String, default: '' },
+          matchDate: { type: String, default: '' },
+        },
+      ],
+      standings: [
+        {
+          teamName: { type: String, required: true },
+          played: { type: Number, default: 0 },
+          won: { type: Number, default: 0 },
+          drawn: { type: Number, default: 0 },
+          lost: { type: Number, default: 0 },
+          points: { type: Number, default: 0 },
+          extra: { type: String, default: '' },
+        },
+      ],
+    },
   },
   {
     timestamps: true,

@@ -8,6 +8,10 @@ const fail = (res, status, message) => res.status(status).json({ success: false,
 // POST /api/events/:eventId/register (participants only)
 export const registerForEvent = async (req, res, next) => {
   try {
+    if (req.user?.role === 'organizer') {
+      return fail(res, 403, 'Organizers and staff members are not eligible to register or participate in events.');
+    }
+
     const event = await Event.findById(req.params.eventId);
     if (!event || event.status !== 'published') return fail(res, 404, 'Event not found or not open for registration.');
 
@@ -21,9 +25,12 @@ export const registerForEvent = async (req, res, next) => {
       return fail(res, 400, 'You cancelled your registration earlier. Re-registering is not allowed.');
     }
 
-    if ((await Registration.countDocuments({ eventId: event._id, status: 'confirmed' })) >= event.capacity) {
+    if ((await Registration.countDocuments({ eventId: event._id, status: 'confirmed', roleInTeam: { $ne: 'player' } })) >= event.capacity) {
       return fail(res, 400, 'This event is full.');
     }
+
+    const { teamName, squadSize, playerNotes } = req.body || {};
+    const isTeamSport = event.category === 'sports' && Boolean((teamName || '').trim());
 
     let registration;
     for (let attempt = 0; attempt < 3 && !registration; attempt++) {
@@ -33,6 +40,11 @@ export const registerForEvent = async (req, res, next) => {
           participantId: req.user._id,
           ticketCode: generateTicketCode(event.category),
           registeredAt: now,
+          teamName: (teamName || '').trim(),
+          squadSize: Number(squadSize) || 1,
+          playerNotes: (playerNotes || '').trim(),
+          isCaptain: isTeamSport,
+          roleInTeam: isTeamSport ? 'captain' : 'solo',
         });
       } catch (err) {
         // Retry only if the random ticket code collided; any other duplicate is handled below.
@@ -41,10 +53,10 @@ export const registerForEvent = async (req, res, next) => {
     }
     if (!registration) return fail(res, 500, 'Could not generate a ticket. Please try again.');
 
-    // Concurrency guard (works without transactions): if more confirmed registrations than seats
+    // Concurrency guard (works without transactions): if more confirmed team registrations than capacity
     // exist at or before this one, this request lost the race, so roll it back.
     const position = await Registration.countDocuments({
-      eventId: event._id, status: 'confirmed', _id: { $lte: registration._id },
+      eventId: event._id, status: 'confirmed', roleInTeam: { $ne: 'player' }, _id: { $lte: registration._id },
     });
     if (position > event.capacity) {
       await Registration.deleteOne({ _id: registration._id });

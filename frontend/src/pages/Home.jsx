@@ -61,11 +61,6 @@ export const Home = () => {
           ))}
         </div>
       </section>
-
-      <section className="home-bottom-cta">
-        <div><span className="eyebrow">MAKE IT HAPPEN</span><h2>Have something worth sharing?</h2><p>Bring your community together. Your next event starts with one idea.</p></div>
-        <Link to={user ? homeFor(user) : '/register'} className="btn">{user ? 'Go to your dashboard' : 'Get started'} <span aria-hidden="true">↗</span></Link>
-      </section>
     </>
   );
 };

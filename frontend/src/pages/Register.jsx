@@ -18,7 +18,7 @@ export const Register = () => {
     setBusy(true);
     try {
       const result = await register(form.name, form.email, form.password);
-      navigate('/login', { replace: true, state: { notice: result.message } });
+      navigate(homeFor(result.user) || '/events', { replace: true });
     } catch (err) {
       setError(err.message);
       setBusy(false);

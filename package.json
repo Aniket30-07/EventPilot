@@ -6,6 +6,8 @@
     "start": "node backend/src/server.js",
     "backend": "npm --prefix backend run dev",
     "frontend": "npm --prefix frontend run dev",
+    "test": "npm --prefix backend test",
+    "seed": "node backend/src/scripts/resetAndSeed.js",
     "lint": "npm --prefix frontend run lint",
     "build": "npm --prefix frontend run build"
   }

@@ -323,17 +323,194 @@ input:focus, select:focus, textarea:focus { outline-color: rgba(255,118,94,.75);
 .account-form-links { display: flex; justify-content: flex-end; color: #ff9a82; font-size: .8rem; font-weight: 600; }
 .account-bottom-link { text-align: center; font-size: .83rem; }
 .account-card a:not(.btn) { color: #ff9a82; }
-.security-panel { max-width: 720px; margin: 0 auto; align-items: flex-start; }
-.security-panel > h1 { margin: 0; }
-.security-panel > p { max-width: 540px; }
-.security-panel > .btn { margin-top: .5rem; }
-.mfa-setup-details { display: flex; flex-direction: column; align-items: flex-start; gap: .55rem; padding: 1rem; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(0,0,0,.14); }
-.mfa-setup-details h2 { margin: 0; font-size: 1.25rem; }
-.mfa-setup-details p, .recovery-codes p { color: var(--muted); font-size: .84rem; }
-.mfa-setup-details > code { max-width: 100%; overflow-wrap: anywhere; padding: .6rem .75rem; border: 1px dashed rgba(255,155,131,.32); border-radius: 8px; background: rgba(255,118,94,.06); color: #ffc0ad; letter-spacing: .12em; }
-.mfa-setup-details a { color: #ff9a82; font-size: .84rem; font-weight: 700; }
-.recovery-codes { width: 100%; padding: 1rem; border: 1px solid rgba(255,193,90,.25); border-radius: 12px; background: rgba(255,193,90,.06); }
-.recovery-codes h3 { margin: 0 0 .35rem; }
-.recovery-codes > div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .5rem; margin-top: .85rem; }
-.recovery-codes code { padding: .45rem .6rem; border-radius: 7px; background: rgba(0,0,0,.25); color: #ffdf9a; text-align: center; }
-.mfa-disable-form { width: 100%; }
+
+/* ==================== HACKATHON LEADERBOARD & SUBMISSIONS ==================== */
+.feature-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.35rem; display: flex; flex-direction: column; gap: 1rem; }
+.feature-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.feature-header h3 { font-size: 1.25rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: .5rem; }
+.feature-desc { color: var(--muted); font-size: .88rem; margin-top: .15rem; }
+
+.leaderboard-table-wrap { overflow-x: auto; width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+.leaderboard-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .88rem; }
+.leaderboard-table th { background: rgba(0,0,0,.35); padding: .75rem 1rem; color: var(--muted); font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+.leaderboard-table td { padding: .85rem 1rem; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: middle; }
+.leaderboard-table tr:last-child td { border-bottom: none; }
+.leaderboard-table tr:hover td { background: rgba(255,255,255,.02); }
+
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; font-size: .85rem; }
+.rank-badge.rank-1 { background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; box-shadow: 0 0 12px rgba(251,191,36,.4); }
+.rank-badge.rank-2 { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #000; }
+.rank-badge.rank-3 { background: linear-gradient(135deg, #f97316, #b45309); color: #fff; }
+.rank-badge.rank-other { background: rgba(255,255,255,.1); color: var(--muted); font-weight: 600; }
+
+.score-badge { display: inline-flex; align-items: center; padding: .25rem .65rem; border-radius: 6px; font-weight: 800; font-size: .95rem; background: rgba(16,185,129,.15); color: var(--ok); border: 1px solid rgba(16,185,129,.3); }
+.score-badge.pending { background: rgba(255,255,255,.06); color: var(--muted); border-color: var(--border); font-size: .8rem; font-weight: 500; }
+
+.project-title { font-weight: 700; font-size: .95rem; color: var(--text); }
+.project-tagline { font-size: .8rem; color: var(--muted); margin-top: .1rem; }
+.project-meta { font-size: .78rem; color: var(--muted); display: flex; align-items: center; gap: .5rem; margin-top: .2rem; }
+.ticket-code-badge { font-family: ui-monospace, monospace; font-size: .75rem; padding: .15rem .45rem; background: rgba(99,102,241,.18); color: #a5b4fc; border-radius: 4px; font-weight: 600; }
+
+.links-group { display: flex; gap: .45rem; flex-wrap: wrap; }
+.link-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; font-weight: 600; padding: .25rem .55rem; border-radius: 6px; background: rgba(56,189,248,.1); color: var(--accent); border: 1px solid rgba(56,189,248,.25); }
+.link-pill:hover { background: rgba(56,189,248,.2); text-decoration: none; }
+.link-pill.github { background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.2); }
+.link-pill.github:hover { background: rgba(255,255,255,.16); }
+
+/* ==================== SUBMISSION STATUS CARD ==================== */
+.submitted-card { border: 1px solid rgba(99,102,241,.3); background: rgba(99,102,241,.05); border-radius: 12px; padding: 1.15rem; display: flex; flex-direction: column; gap: .75rem; }
+.submitted-header { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
+.evaluation-feedback-box { background: rgba(0,0,0,.25); border-left: 3px solid var(--ok); padding: .75rem 1rem; border-radius: 0 8px 8px 0; font-size: .85rem; }
+
+/* ==================== CONFERENCE & WEBINAR RECAP ==================== */
+.recap-container { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.35rem; display: flex; flex-direction: column; gap: 1rem; }
+.takeaways-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; margin-top: .4rem; }
+.takeaways-list li { display: flex; align-items: flex-start; gap: .6rem; font-size: .9rem; color: var(--text); }
+.takeaway-icon { color: var(--ok); font-weight: 800; font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
+.recap-buttons { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
+
+/* ==================== SPORTS FIXTURES & STANDINGS ==================== */
+.sports-matches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .85rem; }
+.match-card { background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 10px; padding: .85rem 1rem; display: flex; flex-direction: column; gap: .5rem; }
+.match-header { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+.match-teams { display: flex; flex-direction: column; gap: .35rem; margin: .25rem 0; }
+.team-row { display: flex; justify-content: space-between; align-items: center; font-size: .92rem; font-weight: 600; }
+.team-row.winner { color: var(--ok); font-weight: 700; }
+.match-score { font-family: ui-monospace, monospace; font-size: 1.05rem; font-weight: 800; background: rgba(255,255,255,.08); padding: .1rem .45rem; border-radius: 4px; }
+
+/* ==================== MODAL OVERLAY ==================== */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-box { background: #131728; border: 1px solid rgba(255,255,255,.15); border-radius: 14px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 20px 40px rgba(0,0,0,.6); }
+.modal-box h2 { margin: 0; font-size: 1.35rem; }
+
+/* ==================== LIVE EVENT COUNTDOWN ==================== */
+.event-countdown-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 107, 74, 0.3);
+  background: linear-gradient(135deg, rgba(255, 107, 74, 0.08), rgba(20, 24, 41, 0.85));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  margin-bottom: 0.5rem;
+}
+.event-countdown-bar.live {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(20, 24, 41, 0.85));
+}
+.event-countdown-bar.concluded {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.countdown-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.countdown-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #ff6b4a;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 107, 74, 0.5);
+}
+.event-countdown-bar.live .countdown-badge {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+  animation: pulse-live 2s infinite ease-in-out;
+}
+.event-countdown-bar.concluded .countdown-badge {
+  background: var(--muted);
+  box-shadow: none;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.04); }
+}
+
+.countdown-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.countdown-clock {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.countdown-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.segment-value {
+  font-family: ui-monospace, 'Roboto Mono', Menlo, Consolas, monospace;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+}
+.segment-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+.segment-divider {
+  font-family: ui-monospace, monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 0.75rem;
+}
+
+/* ==================== ORGANIZER TEAM MANAGEMENT ==================== */
+.team-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.status-pill.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--ok);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-pill.suspended {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+

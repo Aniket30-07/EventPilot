@@ -1,5 +1,6 @@
 import Event, { EVENT_CATEGORIES } from '../models/Event.js';
 import Registration from '../models/Registration.js';
+import Submission from '../models/Submission.js';
 import { getEventMetrics, shapeMetrics } from '../utils/metrics.js';
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -29,13 +30,13 @@ const validateEvent = (e, { requireFutureStart = false } = {}) => {
     if (!(typeof e.venue === 'string' && e.venue.trim())) return 'Venue is required for in-person events.';
     if (e.venue.trim().length > 300) return 'Venue cannot exceed 300 characters.';
   }
-  if (e.mode === 'online') {
-    if (typeof e.onlineLink !== 'string' || e.onlineLink.length > 2048) return 'Meeting link cannot exceed 2048 characters.';
+  if (e.mode === 'online' && e.onlineLink && e.onlineLink.trim()) {
+    if (e.onlineLink.length > 2048) return 'Platform link cannot exceed 2048 characters.';
     try {
       const u = new URL(e.onlineLink);
       if (!['http:', 'https:'].includes(u.protocol)) throw new Error();
     } catch {
-      return 'A valid meeting link (http/https) is required for online events.';
+      return 'Please enter a valid URL (http/https) or leave blank.';
     }
   }
   return null;
@@ -90,13 +91,17 @@ export const getEventById = async (req, res, next) => {
     obj.remainingSeats = m.remainingSeats;
 
     let myRegistration = null;
+    let mySubmission = null;
     if (req.user?.role === 'participant') {
       myRegistration = await Registration.findOne({ eventId: event._id, participantId: req.user._id });
+      if (event.category === 'hackathon') {
+        mySubmission = await Submission.findOne({ eventId: event._id, participantId: req.user._id });
+      }
     }
     // The private meeting link is only shown to the owner and to confirmed registrants.
     if (!owner && myRegistration?.status !== 'confirmed') delete obj.onlineLink;
 
-    res.status(200).json({ success: true, event: obj, isOwner: owner, myRegistration });
+    res.status(200).json({ success: true, event: obj, isOwner: owner, myRegistration, mySubmission });
   } catch (error) {
     next(error);
   }
@@ -110,15 +115,18 @@ export const createEvent = async (req, res, next) => {
     const err = validateEvent(data, { requireFutureStart: true });
     if (err) return fail(res, 400, err);
 
+    const sportsData = body.sportsData && typeof body.sportsData === 'object' ? body.sportsData : undefined;
+
     const event = await Event.create({
       ...data,
       title: data.title.trim(),
       description: data.description.trim(),
       capacity: Number(data.capacity),
       venue: data.mode === 'in-person' ? data.venue.trim() : '',
-      onlineLink: data.mode === 'online' ? data.onlineLink.trim() : '',
+      onlineLink: data.mode === 'online' ? (data.onlineLink || '').trim() : '',
       organizerId: req.user._id,
       status: 'draft',
+      ...(sportsData ? { sportsData } : {}),
     });
     res.status(201).json({ success: true, message: 'Event saved as draft.', event });
   } catch (error) {
@@ -147,8 +155,13 @@ export const updateEvent = async (req, res, next) => {
       description: merged.description.trim(),
       capacity: Number(merged.capacity),
       venue: merged.mode === 'in-person' ? merged.venue.trim() : '',
-      onlineLink: merged.mode === 'online' ? merged.onlineLink.trim() : '',
+      onlineLink: merged.mode === 'online' ? (merged.onlineLink || '').trim() : '',
     });
+
+    if (req.body?.sportsData && typeof req.body.sportsData === 'object') {
+      event.sportsData = { ...event.sportsData?.toObject(), ...req.body.sportsData };
+    }
+
     await event.save();
     res.status(200).json({ success: true, message: 'Event updated.', event });
   } catch (error) {
@@ -217,3 +230,85 @@ export const getOrganizerAnalytics = async (req, res, next) => {
     next(error);
   }
 };
+
+// PATCH /api/events/:eventId/recap — organizer updates post-event recap/summary
+export const updateEventRecap = async (req, res, next) => {
+  try {
+    const event = await loadOwnedEvent(req, res);
+    if (!event) return;
+
+    const { summary, keyTakeaways, recordingUrl, slidesUrl } = req.body || {};
+    event.recap = {
+      summary: typeof summary === 'string' ? summary.trim() : event.recap?.summary || '',
+      keyTakeaways: Array.isArray(keyTakeaways)
+        ? keyTakeaways.map((k) => String(k).trim()).filter(Boolean)
+        : event.recap?.keyTakeaways || [],
+      recordingUrl: typeof recordingUrl === 'string' ? recordingUrl.trim() : event.recap?.recordingUrl || '',
+      slidesUrl: typeof slidesUrl === 'string' ? slidesUrl.trim() : event.recap?.slidesUrl || '',
+      publishedAt: new Date(),
+    };
+
+    await event.save();
+    res.status(200).json({ success: true, message: 'Event recap & takeaways updated!', recap: event.recap });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// PATCH /api/events/:eventId/sports — organizer updates matches and tournament standings
+export const updateSportsData = async (req, res, next) => {
+  try {
+    const event = await loadOwnedEvent(req, res);
+    if (!event) return;
+
+    const { sportType, tournamentFormat, maxTeams, matches, standings } = req.body || {};
+
+    if (!event.sportsData) {
+      event.sportsData = { sportType: 'football', tournamentFormat: 'knockout_4', maxTeams: 4, matches: [], standings: [] };
+    }
+
+    if (sportType && ['football', 'cricket', 'chess', 'general'].includes(sportType)) {
+      event.sportsData.sportType = sportType;
+    }
+
+    if (tournamentFormat && ['knockout_2', 'knockout_4', 'knockout_8', 'round_robin', 'custom'].includes(tournamentFormat)) {
+      event.sportsData.tournamentFormat = tournamentFormat;
+    }
+
+    if (maxTeams && Number.isInteger(Number(maxTeams)) && Number(maxTeams) >= 2) {
+      event.sportsData.maxTeams = Number(maxTeams);
+      event.capacity = Number(maxTeams);
+    }
+
+    if (Array.isArray(matches)) {
+      event.sportsData.matches = matches.map((m) => ({
+        round: m.round || 'Match 1',
+        teamA: String(m.teamA || '').trim(),
+        teamB: String(m.teamB || '').trim(),
+        scoreA: m.scoreA !== undefined && m.scoreA !== null ? String(m.scoreA).trim() : '-',
+        scoreB: m.scoreB !== undefined && m.scoreB !== null ? String(m.scoreB).trim() : '-',
+        status: ['scheduled', 'live', 'completed'].includes(m.status) ? m.status : 'scheduled',
+        winner: String(m.winner || '').trim(),
+        matchDate: String(m.matchDate || '').trim(),
+      })).filter((m) => m.teamA && m.teamB);
+    }
+
+    if (Array.isArray(standings)) {
+      event.sportsData.standings = standings.map((s) => ({
+        teamName: String(s.teamName || '').trim(),
+        played: Number(s.played) || 0,
+        won: Number(s.won) || 0,
+        drawn: Number(s.drawn) || 0,
+        lost: Number(s.lost) || 0,
+        points: Number(s.points) || 0,
+        extra: String(s.extra || '').trim(),
+      })).filter((s) => s.teamName).sort((a, b) => b.points - a.points);
+    }
+
+    await event.save();
+    res.status(200).json({ success: true, message: 'Sports schedule & standings updated!', sportsData: event.sportsData });
+  } catch (error) {
+    next(error);
+  }
+};
+

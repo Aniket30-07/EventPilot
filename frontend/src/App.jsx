@@ -11,7 +11,9 @@ import { EventForm } from './pages/EventForm';
 import { ParticipantDashboard } from './pages/ParticipantDashboard';
 import { OrganizerDashboard } from './pages/OrganizerDashboard';
 import { EventAttendees } from './pages/EventAttendees';
-import { ForgotPassword, OrganizerSecurity, ResetPassword, VerifyEmail } from './pages/AccountSecurity';
+import { OrganizerSubmissions } from './pages/OrganizerSubmissions';
+import { OrganizerTeam } from './pages/OrganizerTeam';
+import { ForgotPassword, ResetPassword, VerifyEmail } from './pages/AccountSecurity';
 
 const organizerOnly = (el) => <ProtectedRoute role="organizer">{el}</ProtectedRoute>;
 
@@ -35,10 +37,11 @@ export default function App() {
             <Route path="/my-registrations" element={<Navigate to="/participant" replace />} />
 
             <Route path="/organizer" element={organizerOnly(<OrganizerDashboard />)} />
-            <Route path="/organizer/security" element={organizerOnly(<OrganizerSecurity />)} />
+            <Route path="/organizer/team" element={organizerOnly(<OrganizerTeam />)} />
             <Route path="/organizer/events/new" element={organizerOnly(<EventForm />)} />
             <Route path="/organizer/events/:eventId/edit" element={organizerOnly(<EventForm />)} />
             <Route path="/organizer/events/:eventId/attendees" element={organizerOnly(<EventAttendees />)} />
+            <Route path="/organizer/events/:eventId/submissions" element={organizerOnly(<OrganizerSubmissions />)} />
 
             <Route path="*" element={
               <div className="card center">

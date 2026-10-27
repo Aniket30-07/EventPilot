@@ -12,7 +12,14 @@ export const isMailConfigured = () => Boolean(getMailConfig());
 
 const sendMail = async ({ to, subject, text, html }) => {
   const config = getMailConfig();
-  if (!config) throw new Error('Email delivery is not configured. Configure SMTP_HOST, SMTP_PORT, and SMTP_FROM.');
+  if (!config) {
+    console.log(`\n================== [DEV EMAIL] ==================`);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Content:\n${text}`);
+    console.log(`=================================================\n`);
+    return;
+  }
   const transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,

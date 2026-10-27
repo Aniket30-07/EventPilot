@@ -50,7 +50,10 @@ export const OrganizerDashboard = () => {
     <>
       <div className="row spread">
         <h1>Organizer dashboard</h1>
-        <Link to="/organizer/events/new" className="btn">＋ Create event</Link>
+        <div className="row">
+          <Link to="/organizer/team" className="btn ghost">👥 Team Management</Link>
+          <Link to="/organizer/events/new" className="btn">＋ Create event</Link>
+        </div>
       </div>
 
       {error && <div className="alert error">{error} <button className="link" onClick={load}>Retry</button></div>}
@@ -89,6 +92,9 @@ export const OrganizerDashboard = () => {
           </div>
           <div className="row">
             <Link className="btn sm" to={`/organizer/events/${ev._id}/attendees`}>Attendees</Link>
+            {ev.category === 'hackathon' && (
+              <Link className="btn sm ghost" to={`/organizer/events/${ev._id}/submissions`}>🚀 Submissions</Link>
+            )}
             {ev.status !== 'cancelled' && <Link className="btn ghost sm" to={`/organizer/events/${ev._id}/edit`}>Edit</Link>}
             {ev.status === 'draft' && (
               <button className="btn success sm" disabled={busyId === ev._id} onClick={() => act(ev._id, 'publish', 'Event published.')}>Publish</button>

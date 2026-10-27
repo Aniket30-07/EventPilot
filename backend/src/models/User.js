@@ -34,16 +34,19 @@ const userSchema = new mongoose.Schema(
       },
       default: 'participant',
     },
+    status: {
+      type: String,
+      enum: {
+        values: ['active', 'suspended'],
+        message: 'Status must be active or suspended',
+      },
+      default: 'active',
+    },
     emailVerified: { type: Boolean, default: true },
     emailVerificationTokenHash: { type: String, default: null, select: false },
     emailVerificationExpiresAt: { type: Date, default: null, select: false },
     passwordResetTokenHash: { type: String, default: null, select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
-    mfaEnabled: { type: Boolean, default: false },
-    mfaSecretEncrypted: { type: String, default: null, select: false },
-    mfaPendingSecretEncrypted: { type: String, default: null, select: false },
-    mfaPendingExpiresAt: { type: Date, default: null, select: false },
-    mfaRecoveryCodeHashes: { type: [String], default: [], select: false },
   },
   {
     timestamps: true,
@@ -68,7 +71,6 @@ userSchema.methods.toJSON = function () {
     'passwordHash', '__v', 'authTokenVersion',
     'emailVerificationTokenHash', 'emailVerificationExpiresAt',
     'passwordResetTokenHash', 'passwordResetExpiresAt',
-    'mfaSecretEncrypted', 'mfaPendingSecretEncrypted', 'mfaPendingExpiresAt', 'mfaRecoveryCodeHashes',
   ]) {
     delete obj[field];
   }
