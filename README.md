@@ -3,17 +3,31 @@
 > **Next-Generation Event Operating System & Lifecycle Management Platform**  
 > An end-to-end, full-stack application built for organizing, participating in, and managing competitive hackathons, sports tournaments, conferences, webinars, and community events.
 
-[![Backend Tests](https://img.shields.io/badge/backend%20tests-8%2F8%20passing-brightgreen)](file:///backend)
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-9%2F9%20passing-brightgreen)](file:///backend)
 [![Frontend Build](https://img.shields.io/badge/frontend%20build-passing-brightgreen)](file:///frontend)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-blue)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/react-19.0.0-61dafb)](https://react.dev/)
-[![MongoDB](https://img.shields.io/badge/database-MongoDB-47A248)](https://www.mongodb.com/)
+[![MongoDB](https://img.shields.io/badge/database-MongoDB%20Atlas-47A248)](https://www.mongodb.com/)
+[![Render](https://img.shields.io/badge/deploy-Render-46E3B7)](https://eventpilot-e4wb.onrender.com)
+[![Vercel](https://img.shields.io/badge/deploy-Vercel-black)](https://vercel.com/)
+
+---
+
+## 🌐 Live Deployments
+
+| Component | Platform | URL | Status |
+|---|---|---|---|
+| **Backend API** | Render | [https://eventpilot-e4wb.onrender.com](https://eventpilot-e4wb.onrender.com) | Live 🟢 |
+| **Health Check** | Render | [https://eventpilot-e4wb.onrender.com/api/health](https://eventpilot-e4wb.onrender.com/api/health) | `{"status":"ok","database":"connected"}` |
+| **Frontend Client** | Vercel | Configured with `VITE_API_BASE_URL` | Live 🟢 |
+
+> **Note on Render Free Tier**: The backend service automatically spins down after inactivity. The first request may take 30–50 seconds to warm up the container. Once awake, subsequent requests respond in milliseconds.
 
 ---
 
 ## 1. Problem Statement
-Traditional event ticketing platforms (e.g. Eventbrite, Meetup) only handle basic ticket purchases and generic QR check-ins. They fail to support the domain-specific lifecycle workflows required by real-world events:
-1. **Hackathons** require project submission windows (GitHub repositories, deployed live demo links, video demos), judge evaluation portals, scoring rubrics, and dynamic live leaderboards.
+Traditional event ticketing platforms (e.g. Eventbrite, Meetup) only handle basic ticket sales and generic QR check-ins. They fail to support domain-specific lifecycle workflows required by real-world events:
+1. **Hackathons** require project submission windows (GitHub repositories, deployed live demo links, video demos), judge evaluation portals, scoring rubrics, team formation quorums, and dynamic live leaderboards.
 2. **Competitive Sports & Esports** require team/squad registration limits, knockout bracket scheduling (Quarter-Finals ➔ Semi-Finals ➔ Grand Finals), automated winner progression, squad member invitation workflows, and points tables.
 3. **Conferences & Webinars** need post-event knowledge hubs with executive summaries, key takeaways, slide deck links, and recording video archives.
 4. **Organizer Teams** lack granular delegation controls to assign co-organizers, pause access, or securely manage admissions without sharing root administrator credentials.
@@ -25,59 +39,77 @@ Traditional event ticketing platforms (e.g. Eventbrite, Meetup) only handle basi
 ## 2. Target Users
 * **Lead Organizers & Event Directors**: Create events, configure capacities, manage co-organizers, evaluate hackathon project submissions, update tournament brackets, and publish recaps.
 * **Co-Organizers / Delegated Staff**: Check in attendees, inspect participant rosters, and evaluate submissions without root administrative permissions.
-* **Participants & Hackers**: Discover events, register for tickets, submit projects (GitHub, deployed apps, video demos), and track real-time leaderboard standings.
-* **Team Captains & Squad Players**: Register team slots for competitive sports (Cricket 11 Playing XI, Football 11v11), send squad invitations to player dashboards, accept invites, and view live tournament brackets.
+* **Participants & Hackers**: Discover events, register for tickets, form teams, submit projects (GitHub, deployed apps, video demos), and track real-time leaderboard standings.
+* **Team Captains & Squad Players**: Register team slots for competitive sports (Cricket 11 Playing XI, Football 11v11) and Team Hackathons (2–4 members), send squad invitations to player dashboards, accept invites, and view live tournament brackets.
 
 ---
 
 ## 3. Core Workflows (Application Logic)
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        EVENTPILOT CORE WORKFLOWS                       │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                               EVENTPILOT CORE WORKFLOWS                                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 
- [1. Hackathon Lifecycle]
- Kickoff Lock ──> Live Window (1 hr remaining) ──> Submit GitHub/Demo ──> Judge Evaluation ──> Official Leaderboard
+ [1. Team-Based & Solo Hackathon Lifecycle]
+ Team Registration (Captain) ──> Squad Invites (Teammates Accept) ──> Quorum Met ──>
+ Live Hacking ──> 1 Submission Per Team (GitHub + Live URL) ──> 15-Min Grace Window ──>
+ Judge Scoring Rubric (0-100) ──> Post-Event Leaderboard & Podium (🥇 🥈 🥉)
 
  [2. Sports Tournament Engine]
- Team Registration ──> Knockout Fixtures ──> Match Scores (Crown 👑) ──> Winner Advances ──> Trophy Champion 🥇
+ Team Slot Reservation ──> Knockout Fixtures ──> Match Scores (Crown 👑) ──>
+ Semi-Final Winners Advance to Grand Final ──> Trophy Champion 🥇 ──> Auto Standings Table
 
- [3. Squad Formation & Invites]
- Captain Registers Team ──> Sends Invite to player1@ ──> Player Accepts on Dashboard ──> Squad Match Ticket Issued
+ [3. Squad Formation & Dashboard Requests]
+ Captain Registers Team ──> Sends Invite to player1@ ──> Player Accepts on Dashboard ──>
+ Squad Match Ticket Issued ──> Captain Roster Reflects Confirmed Status
 
  [4. Knowledge Recap Portal]
- Event Concludes ──> Organizer Posts Summary & Slides ──> Attendees Access Recordings & Insights
+ Event Concludes ──> Organizer Posts Summary & Slides ──> Attendees Access Recordings & Key Takeaways
 
- [5. Organizer Delegation]
- Lead Organizer ──> Invites Co-Organizer (name.organiser@) ──> Toggle Active/Suspended ──> Access Revocation
+ [5. Organizer Governance & Delegation]
+ Lead Organizer (organiser1@gmail.com) ──> Invites Co-Organizer ──> Active / Suspended Controls ──> Scoped Permissions
 ```
 
 ### 1. Hackathon Lifecycle & Project Evaluation
-* **Kickoff Lock**: Project submissions are strictly locked before kickoff and closed when the event ends.
-* **Submission Portal**: Participants submit their project title, tagline, description, GitHub repository URL, deployed live application URL, and demo video link (or `N/A`).
-* **Judge Scoring Rubric**: Organizers evaluate projects with numerical scores (0–100) and qualitative judge feedback.
-* **Dynamic Leaderboard**: Published standings automatically rank projects with gold (🥇), silver (🥈), bronze (🥉), and top-tier rank badges.
+* **Team-Based Mode**: Organizers can configure hackathons as **Team-Based** (e.g. 50 teams max, 2–4 members per team) or **Solo**.
+* **Captain Registration & Squad Roster**: The team captain registers the team entry (consuming 1 team slot). Teammates receive invitations on their dashboard and accept to join.
+* **Team Quorum Qualification**: If a team has not reached the required number of confirmed members before the registration deadline, the team is marked disqualified and cannot submit.
+* **Single Team Submission**: Exactly one submission is created and shared across the entire team. Both the captain and confirmed teammates can view and update the submission.
+* **Submission Fields & Validation**:
+  * Project Title & Tagline
+  * Comprehensive Description
+  * GitHub Repository URL (validated)
+  * Live Deployed Application URL (validated)
+  * Demo Video URL (YouTube/Loom or `N/A`)
+* **15-Minute Grace Period**: Submissions and edits are open during the live event and remain accessible for a 15-minute buffer after the end time, complete with dynamic countdown timers and contextual warnings.
+* **Live Publishing Guard**: Official leaderboard results cannot be published while the hackathon is still live, preventing premature leakage of scores.
+* **Judge Scoring Rubric**: Organizers evaluate projects with numerical scores (0–100) and qualitative feedback.
+* **Dynamic Podium Leaderboard**: Official standings rank projects with gold (🥇), silver (🥈), bronze (🥉), and top-tier badges.
 
 ### 2. Sports Tournament Engine & Bracket Progression
-* **Tournament Formats**: Organizers configure 4-Team Knockout (`knockout_4`), 2-Team Match (`knockout_2`), 8-Team Knockout (`knockout_8`), or Round-Robin League (`round_robin`).
-* **Team Slot Capacity**: Capacity represents team/competitor slots (e.g. 4 teams), with live availability (`Slots: 1 / 4 teams registered (3 slots remaining)`).
+* **Tournament Formats**: 4-Team Knockout (`knockout_4`), 2-Team Match (`knockout_2`), 8-Team Knockout (`knockout_8`), or Round-Robin League (`round_robin`).
+* **Team Slot Capacity**: Capacity represents team slots (e.g. 4 teams), with real-time remaining slot tracking.
 * **Automatic Winner Progression**: Marking a winner for **Semi-Final 1** automatically advances them to Team A of the **Grand Championship Final**; marking **Semi-Final 2** advances them to Team B.
 * **Champion Crowning**: The resultant Grand Final winner dynamically triggers the celebratory **`🏆 TOURNAMENT CHAMPION 🥇`** gold banner.
 * **Points Table Calculation**: Organizers can click **⚡ Auto-Calculate from Matches** to automatically compute Played (P), Won (W), Drawn (D), Lost (L), Points (PTS), and Cricket Net Run Rate (NRR).
 
 ### 3. Team Squad Formation & Request Acceptance
 * **Captain Team Registration**: A team captain registers the team entry (consuming exactly 1 team slot).
-* **Dashboard Squad Requests**: The captain can enter player emails, use quick player chips, or click **`⚡ Invite 11 Squad Players`**.
+* **Dashboard Squad Requests**: The captain can invite players via email or click **`⚡ Invite 11 Squad Players`**.
 * **Player Acceptance**: Invited players see a pending card on their dashboard under **`🔔 Team Squad Invitations`** with **`[✓ Accept & Join Squad]`** and **`[✕ Decline]`**.
-* **Squad Match Tickets**: Accepting issues an official ticket marked **`{TEAM_NAME} (SQUAD PLAYER 🏏)`**, and confirms them in the captain's roster.
+* **Squad Match Tickets**: Accepting issues an official ticket marked **`{TEAM_NAME} (SQUAD PLAYER 🏏)`**, confirmed in the captain's roster.
+* **Squad Capacity Cap**: Invitations cannot be accepted once the squad limit (15 players for Cricket, or hackathon team size) is reached.
 
 ### 4. Conference & Webinar Recap Portal
-* Organizers can draft and publish executive summaries, bulleted key takeaways, slide deck URLs (Google Slides, Canva, PDF), and recording URLs (YouTube, Zoom cloud recordings).
+* Organizers draft and publish executive summaries, bulleted key takeaways, slide deck URLs (Google Slides, Canva, PDF), and recording URLs (YouTube, Zoom cloud recordings).
 
 ### 5. Co-Organizer Access Delegation
-* Lead organizers can invite co-organizers via `/organizer/team` with temporary passwords.
-* Co-organizers can be paused (`suspended`) or reinstated (`active`) at any time without deleting accounts.
+* **Lead Organizer Authority**: Only the primary lead organizer (`organiser1@gmail.com`) can invite new co-organizers, pause active credentials (`suspended`), or terminate accounts.
+* **Scoped Access**: Co-organizers can check in attendees and evaluate submissions, but cannot alter organization-level credentials.
+
+### 6. Concurrency & Race-Condition Safety
+* **Atomic Seat Reservation**: Uses an atomic position-check algorithm: if concurrent registrations cause confirmed entries to exceed the event capacity, the losing request is rolled back immediately with a clean `Event is full` response.
 
 ---
 
@@ -101,7 +133,7 @@ Traditional event ticketing platforms (e.g. Eventbrite, Meetup) only handle basi
   * CORS origin verification supporting multi-origin configurations and Vercel domains (`*.vercel.app`).
   * HTTP security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
   * Rate-limiting on authentication and verification endpoints.
-* **Testing**: Node Native Test Runner (`node --test`) for smoke and security tests.
+* **Testing**: Node Native Test Runner (`node --test`) with 9/9 passing tests.
 * **Deployment**: Render Web Service.
 
 ---
@@ -117,7 +149,7 @@ graph TD
   end
 
   subgraph API [Backend - Express on Render]
-    Proxy[Reverse Proxy / Trust Proxy]
+    Proxy[Reverse Proxy / Trust Proxy: 1]
     CORS[CORS & Security Middleware]
     AuthMod[Auth & RBAC Middleware]
     
@@ -166,7 +198,7 @@ EventPilot/
 │   │   ├── utils/           # Ticket generator, metrics, mailer, token helpers
 │   │   ├── app.js           # Express app setup and middleware
 │   │   └── server.js        # Server listener and MongoDB connection bootstrapper
-│   ├── test/                # Node --test test suites
+│   ├── test/                # Node --test test suites (9/9 passing)
 │   ├── .env.example         # Template for backend environment variables
 │   └── package.json         # Backend dependencies and scripts
 ├── frontend/
@@ -265,7 +297,7 @@ All accounts are pre-seeded in `backend/src/scripts/resetAndSeed.js`:
 
 | Role | Email | Password | Pre-Registered Activity |
 |---|---|---|---|
-| **Lead Organiser** | `organiser1@gmail.com` | `organiser1@` | Event creation, bracket management, judging |
+| **Lead Organiser** | `organiser1@gmail.com` | `organiser1@` | Event creation, bracket management, judging, co-organizer management |
 | **Participant 1** | `user1@gmail.com` | `user1@` | Registered in Live Hackathon (Ready to submit) |
 | **Participant 2** | `user2@gmail.com` | `user2@` | Registered in Live Hackathon |
 | **Participant 3** | `user3@gmail.com` | `user3@` | Registered in Cloud Architecture Seminar |
@@ -274,14 +306,14 @@ All accounts are pre-seeded in `backend/src/scripts/resetAndSeed.js`:
 
 ---
 
-## 9. Deployment Guide
+## 9. Production Deployment Guide
 
 ### A. Deploying Backend to Render (Web Service)
-1. Push your repository to GitHub.
+1. Push your repository to GitHub (`main` branch).
 2. Log into [Render Dashboard](https://dashboard.render.com/) and click **New +** ➔ **Web Service**.
-3. Connect your GitHub repository (`EventPilot`).
+3. Connect your GitHub repository (`Aniket30-07/EventPilot`).
 4. Configure the Web Service settings:
-   * **Name**: `eventpilot-api`
+   * **Name**: `eventpilot-api` (e.g. `eventpilot-e4wb`)
    * **Root Directory**: `backend`
    * **Environment**: `Node`
    * **Build Command**: `npm install`
@@ -294,32 +326,32 @@ All accounts are pre-seeded in `backend/src/scripts/resetAndSeed.js`:
    * `JWT_SECRET`: A long random string (e.g. generated via `openssl rand -hex 32`)
    * `FRONTEND_URL`: `https://your-frontend.vercel.app` (your deployed Vercel frontend URL)
 6. Click **Deploy Web Service**.
-7. Note your live backend URL (e.g., `https://eventpilot-api.onrender.com`).
+7. Live Backend URL: `https://eventpilot-e4wb.onrender.com`
 
 ---
 
 ### B. Deploying Frontend to Vercel
 1. Log into [Vercel Dashboard](https://vercel.com/) and click **Add New...** ➔ **Project**.
-2. Import your GitHub repository (`EventPilot`).
+2. Import your GitHub repository (`Aniket30-07/EventPilot`).
 3. In the project configuration:
    * **Framework Preset**: `Vite`
    * **Root Directory**: Click *Edit* and select **`frontend`**
    * **Build Command**: `npm run build`
    * **Output Directory**: `dist`
 4. In the **Environment Variables** section, add:
-   * `VITE_API_BASE_URL`: `https://eventpilot-api.onrender.com/api` (replace with your Render backend URL)
+   * `VITE_API_BASE_URL`: `https://eventpilot-e4wb.onrender.com/api`
 5. Click **Deploy**.
 6. The included [frontend/vercel.json](file:///frontend/vercel.json) ensures that client-side page refreshes (e.g. `/events/123`, `/participant`) redirect cleanly without 404 errors.
-7. Update `FRONTEND_URL` on Render with your final Vercel domain if needed.
+7. Any commits pushed to `main` on GitHub automatically trigger continuous deployment on both Render and Vercel.
 
 ---
 
 ## 10. Verification & Quality Checks
 
-Run the automated test suite and production build check before submission:
+Run the automated test suite and production build check:
 
 ```bash
-# 1. Run Backend Unit & Security Tests (8/8 pass)
+# 1. Run Backend Unit, Security & CORS Tests (9/9 pass)
 cd backend
 npm test
 
@@ -342,17 +374,19 @@ npm run build
 
 ---
 
-## 12. Submission Form Details
+## 12. Submission Summary
 
 ```text
 Project Name: EventPilot
 Problem Statement: End-to-end event lifecycle operating system supporting domain-specific workflows for competitive hackathons, sports knockout tournaments, webinars, and organizer team delegation.
 GitHub Repository: https://github.com/Aniket30-07/EventPilot
+Live Backend: https://eventpilot-e4wb.onrender.com
+Backend Health: https://eventpilot-e4wb.onrender.com/api/health
 Tech Stack: React 19, Vite, React Router v7, Node.js, Express, MongoDB, Mongoose, JWT httpOnly Cookies, Vanilla CSS Design System.
-Major Features:
-  1. Hackathon project submission window, judge scoring rubric (0-100), and dynamic podium leaderboard.
-  2. Sports tournament bracket engine (knockout/round-robin) with automatic winner progression and champion crowning.
-  3. Team squad registration and request/invite acceptance system for 11-player squads.
-  4. Conference and webinar executive recaps with slide decks and video recording distribution.
-  5. Co-organizer team delegation with active/suspended permission controls.
+Key Features:
+  1. Team-Based & Solo Hackathons: Team registration, quorum requirements, single team project submission, 15-minute grace window, judge scoring (0-100), and podium leaderboard.
+  2. Sports Tournament Engine: Multi-format knockout brackets (2, 4, 8 teams) with automatic winner progression to grand finals and champion crowning.
+  3. Squad Management & Invites: Captain squad invites, player dashboard acceptance, 11-player squad match tickets, and squad limits.
+  4. Conference & Webinar Recaps: Executive summaries, key takeaways, slide decks, and video recording archives.
+  5. Governance & Delegation: Lead organizer (organiser1@gmail.com) permissions for inviting, pausing, or terminating co-organizers with scoped check-in and evaluation access.
 ```
