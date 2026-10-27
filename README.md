@@ -266,7 +266,7 @@ VITE_API_BASE_URL=http://localhost:5001/api
 ```
 
 ### 3. Seed Clean Test Data
-To populate the database with the active Hackathon (1 hour remaining), 4-team Cricket tournament, Seminar, and demo accounts:
+To populate the database with the clean initial state (Live Hackathon with 2 teams of 4 ending in 1 hour, Concluded Hackathon with submitted & unsubmitted projects, Cricket 1v1 Final with 15-player squad, and all demo accounts):
 ```bash
 cd backend
 node src/scripts/resetAndSeed.js
@@ -396,9 +396,10 @@ Live Backend: https://eventpilot-e4wb.onrender.com
 Backend Health: https://eventpilot-e4wb.onrender.com/api/health
 Tech Stack: React 19, Vite, React Router v7, Node.js, Express, MongoDB, Mongoose, JWT httpOnly Cookies, Vanilla CSS Design System.
 Key Features:
-  1. Team-Based & Solo Hackathons: Team registration, quorum requirements, single team project submission, 15-minute grace window, judge scoring (0-100), and podium leaderboard.
-  2. Sports Tournament Engine: Multi-format knockout brackets (2, 4, 8 teams) with automatic winner progression to grand finals and champion crowning.
-  3. Squad Management & Invites: Captain squad invites, player dashboard acceptance, 11-player squad match tickets, and squad limits.
+  1. Team-Based & Solo Hackathons: Team registration, quorum requirements (4/4 members), single collaborative project submission, 15-minute grace window, judge scoring rubric (0-100), and podium leaderboard.
+  2. Sports Tournament Engine: Multi-format knockout brackets (1v1 Final, 4-team, 8-team) with automatic winner progression to grand finals and champion crowning.
+  3. Squad Management & Invites: Captain squad invites, player dashboard acceptance, 15-player cricket squad match tickets (Playing XI + 4 reserves), and squad limits.
   4. Conference & Webinar Recaps: Executive summaries, key takeaways, slide decks, and video recording archives.
-  5. Governance & Delegation: Lead organizer (organiser1@gmail.com) permissions for inviting, pausing, or terminating co-organizers with scoped check-in and evaluation access.
+  5. Governance & Delegation: Lead organizer (organiser1@gmail.com / organiser@gmail.com) permissions for inviting, pausing, or terminating co-organizers with scoped check-in and evaluation access.
+  6. 1-Click Role Fill UI: Instant role evaluation buttons on Sign In page for Lead Organiser, Team Captains, Cricket Captain, and Guest Evaluator.
 ```
