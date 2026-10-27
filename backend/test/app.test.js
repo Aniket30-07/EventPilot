@@ -84,3 +84,17 @@ test('Vercel deployment origins are permitted by CORS', async () => {
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://eventpilot-frontend.vercel.app');
 });
 
+test('routes are accessible both with and without /api prefix', async () => {
+  const healthWithApi = await fetch(`${baseUrl}/api/health`, { headers: { Connection: 'close' } });
+  const healthWithoutApi = await fetch(`${baseUrl}/health`, { headers: { Connection: 'close' } });
+  assert.equal(healthWithApi.status, 503);
+  assert.equal(healthWithoutApi.status, 503);
+
+  const authWithoutApi = await fetch(`${baseUrl}/auth/logout`, {
+    method: 'POST',
+    headers: { Origin: 'http://localhost:5173', Connection: 'close' },
+  });
+  assert.equal(authWithoutApi.status, 200);
+});
+
+

@@ -76,8 +76,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoint (available at both /api/health and /health)
+app.get(['/api/health', '/health'], (req, res) => {
   const dbStateMap = {
     0: 'disconnected',
     1: 'connected',
@@ -94,19 +94,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.use('/api', (req, res, next) => {
+app.use((req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.get('Origin')) return next();
   if (isAllowedOrigin(req.get('Origin'))) return next();
   return res.status(403).json({ success: false, message: 'Request origin is not allowed.' });
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/registrations', registrationRoutes);
-app.use('/api/team', teamRoutes);
-app.use('/api', teamInviteRoutes);
-app.get('/api/me/registrations', authenticate, authorizeRoles('participant'), getMyRegistrations);
+// Routes (mounted with and without /api for universal compatibility)
+app.use(['/api/auth', '/auth'], authRoutes);
+app.use(['/api/events', '/events'], eventRoutes);
+app.use(['/api/registrations', '/registrations'], registrationRoutes);
+app.use(['/api/team', '/team'], teamRoutes);
+app.use(['/api', '/'], teamInviteRoutes);
+app.get(['/api/me/registrations', '/me/registrations'], authenticate, authorizeRoles('participant'), getMyRegistrations);
 
 // 404 handler
 app.use((req, res) => {

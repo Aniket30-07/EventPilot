@@ -1,5 +1,6 @@
 const rawBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
-const API_BASE = rawBase.replace(/\/+$/, '');
+const cleanedBase = rawBase.replace(/\/+$/, '');
+const API_BASE = cleanedBase.endsWith('/api') ? cleanedBase : `${cleanedBase}/api`;
 
 export const api = async (path, { method = 'GET', body } = {}) => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;

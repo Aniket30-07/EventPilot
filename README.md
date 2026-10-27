@@ -3,7 +3,7 @@
 > **Next-Generation Event Operating System & Lifecycle Management Platform**  
 > An end-to-end, full-stack application built for organizing, participating in, and managing competitive hackathons, sports tournaments, conferences, webinars, and community events.
 
-[![Backend Tests](https://img.shields.io/badge/backend%20tests-9%2F9%20passing-brightgreen)](file:///backend)
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-10%2F10%20passing-brightgreen)](file:///backend)
 [![Frontend Build](https://img.shields.io/badge/frontend%20build-passing-brightgreen)](file:///frontend)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-blue)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/react-19.0.0-61dafb)](https://react.dev/)
@@ -133,7 +133,7 @@ Traditional event ticketing platforms (e.g. Eventbrite, Meetup) only handle basi
   * CORS origin verification supporting multi-origin configurations and Vercel domains (`*.vercel.app`).
   * HTTP security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
   * Rate-limiting on authentication and verification endpoints.
-* **Testing**: Node Native Test Runner (`node --test`) with 9/9 passing tests.
+* **Testing**: Node Native Test Runner (`node --test`) with 10/10 passing tests.
 * **Deployment**: Render Web Service.
 
 ---
@@ -198,7 +198,7 @@ EventPilot/
 │   │   ├── utils/           # Ticket generator, metrics, mailer, token helpers
 │   │   ├── app.js           # Express app setup and middleware
 │   │   └── server.js        # Server listener and MongoDB connection bootstrapper
-│   ├── test/                # Node --test test suites (9/9 passing)
+│   ├── test/                # Node --test test suites (10/10 passing)
 │   ├── .env.example         # Template for backend environment variables
 │   └── package.json         # Backend dependencies and scripts
 ├── frontend/
@@ -363,7 +363,7 @@ All accounts are pre-seeded in the database via `backend/src/scripts/resetAndSee
 Run the automated test suite and production build check:
 
 ```bash
-# 1. Run Backend Unit, Security & CORS Tests (9/9 pass)
+# 1. Run Backend Unit, Security & CORS Tests (10/10 pass)
 cd backend
 npm test
 
