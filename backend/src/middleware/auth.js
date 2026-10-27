@@ -5,7 +5,9 @@ const loadUser = async (req) => {
   const token = req.cookies?.token;
   if (!token) return null;
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  return User.findById(decoded.id);
+  const user = await User.findById(decoded.id);
+  if (!user || (decoded.version || 0) !== (user.authTokenVersion || 0)) return null;
+  return user;
 };
 
 export const authenticate = async (req, res, next) => {
@@ -28,10 +30,14 @@ export const authenticate = async (req, res, next) => {
 export const optionalAuthenticate = async (req, res, next) => {
   try {
     req.user = (await loadUser(req)) || undefined;
-  } catch {
-    req.user = undefined;
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      req.user = undefined;
+      return next();
+    }
+    next(error);
   }
-  next();
 };
 
 export const authorizeRoles = (...roles) => (req, res, next) => {

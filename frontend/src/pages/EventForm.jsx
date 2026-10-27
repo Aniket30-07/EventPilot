@@ -21,6 +21,7 @@ export const EventForm = () => {
 
   const [form, setForm] = useState(EMPTY);
   const [status, setStatus] = useState('draft');
+  const [createdEventId, setCreatedEventId] = useState('');
   const [loading, setLoading] = useState(editing);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -66,10 +67,13 @@ export const EventForm = () => {
         endAt: new Date(form.endAt).toISOString(),
         registrationDeadline: new Date(form.registrationDeadline).toISOString(),
       };
-      const res = editing
-        ? await api(`/events/${eventId}`, { method: 'PATCH', body })
+      const targetEventId = eventId || createdEventId;
+      const res = targetEventId
+        ? await api(`/events/${targetEventId}`, { method: 'PATCH', body })
         : await api('/events', { method: 'POST', body });
-      if (publishAfter) await api(`/events/${res.event._id}/publish`, { method: 'POST' });
+      const savedEventId = res.event._id;
+      if (!targetEventId) setCreatedEventId(savedEventId);
+      if (publishAfter) await api(`/events/${savedEventId}/publish`, { method: 'POST' });
       navigate('/organizer');
     } catch (e) {
       setError(e.message);
@@ -90,7 +94,7 @@ export const EventForm = () => {
       {error && <div className="alert error">{error}</div>}
 
       <label>Title<input required minLength={3} maxLength={200} value={form.title} onChange={set('title')} /></label>
-      <label>Description<textarea required minLength={10} rows={5} value={form.description} onChange={set('description')} /></label>
+      <label>Description<textarea required minLength={10} maxLength={10000} rows={5} value={form.description} onChange={set('description')} /></label>
 
       <div className="two-col">
         <label>Category
@@ -107,8 +111,8 @@ export const EventForm = () => {
       </div>
 
       {form.mode === 'in-person'
-        ? <label>Venue<input required value={form.venue} onChange={set('venue')} /></label>
-        : <label>Meeting link<input type="url" required placeholder="https://…" value={form.onlineLink} onChange={set('onlineLink')} /></label>}
+        ? <label>Venue<input required maxLength={300} value={form.venue} onChange={set('venue')} /></label>
+        : <label>Meeting link<input type="url" required maxLength={2048} placeholder="https://…" value={form.onlineLink} onChange={set('onlineLink')} /></label>}
 
       <div className="two-col">
         <label>Starts<input type="datetime-local" required value={form.startAt} onChange={set('startAt')} /></label>

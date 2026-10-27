@@ -11,7 +11,9 @@ const EDITABLE = ['title', 'description', 'category', 'startAt', 'endAt', 'mode'
 // Validates a full event object (merged existing + changes). Returns an error string or null.
 const validateEvent = (e, { requireFutureStart = false } = {}) => {
   if (typeof e.title !== 'string' || e.title.trim().length < 3 || e.title.trim().length > 200) return 'Title must be 3–200 characters.';
-  if (typeof e.description !== 'string' || e.description.trim().length < 10) return 'Description must be at least 10 characters.';
+  if (typeof e.description !== 'string' || e.description.trim().length < 10 || e.description.trim().length > 10000) {
+    return 'Description must be 10–10000 characters.';
+  }
   if (!EVENT_CATEGORIES.includes(e.category)) return 'Please choose a valid category.';
   if (!['online', 'in-person'].includes(e.mode)) return 'Mode must be online or in-person.';
 
@@ -23,8 +25,12 @@ const validateEvent = (e, { requireFutureStart = false } = {}) => {
 
   if (!Number.isInteger(Number(e.capacity)) || Number(e.capacity) < 1 || Number(e.capacity) > 100000) return 'Capacity must be a whole number between 1 and 100000.';
 
-  if (e.mode === 'in-person' && !(typeof e.venue === 'string' && e.venue.trim())) return 'Venue is required for in-person events.';
+  if (e.mode === 'in-person') {
+    if (!(typeof e.venue === 'string' && e.venue.trim())) return 'Venue is required for in-person events.';
+    if (e.venue.trim().length > 300) return 'Venue cannot exceed 300 characters.';
+  }
   if (e.mode === 'online') {
+    if (typeof e.onlineLink !== 'string' || e.onlineLink.length > 2048) return 'Meeting link cannot exceed 2048 characters.';
     try {
       const u = new URL(e.onlineLink);
       if (!['http:', 'https:'].includes(u.protocol)) throw new Error();
@@ -156,7 +162,8 @@ export const publishEvent = async (req, res, next) => {
     const event = await loadOwnedEvent(req, res);
     if (!event) return;
     if (event.status !== 'draft') return fail(res, 400, `Only draft events can be published (this one is ${event.status}).`);
-    if (event.endAt <= new Date()) return fail(res, 400, 'This event has already ended. Edit the dates before publishing.');
+    const validationError = validateEvent(event, { requireFutureStart: true });
+    if (validationError) return fail(res, 400, validationError);
 
     event.status = 'published';
     await event.save();

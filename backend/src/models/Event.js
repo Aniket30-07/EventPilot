@@ -32,6 +32,7 @@ const eventSchema = new mongoose.Schema(
       required: [true, 'Event description is required'],
       trim: true,
       minlength: [10, 'Description must be at least 10 characters'],
+      maxlength: [10000, 'Description cannot exceed 10000 characters'],
     },
     category: {
       type: String,
@@ -67,11 +68,13 @@ const eventSchema = new mongoose.Schema(
     venue: {
       type: String,
       trim: true,
+      maxlength: [300, 'Venue cannot exceed 300 characters'],
       default: '',
     },
     onlineLink: {
       type: String,
       trim: true,
+      maxlength: [2048, 'Meeting link cannot exceed 2048 characters'],
       default: '',
     },
     capacity: {

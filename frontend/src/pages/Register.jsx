@@ -17,8 +17,8 @@ export const Register = () => {
     setError('');
     setBusy(true);
     try {
-      await register(form.name, form.email, form.password);
-      navigate('/events', { replace: true });
+      const result = await register(form.name, form.email, form.password);
+      navigate('/login', { replace: true, state: { notice: result.message } });
     } catch (err) {
       setError(err.message);
       setBusy(false);

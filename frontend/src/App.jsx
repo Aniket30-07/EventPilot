@@ -11,6 +11,7 @@ import { EventForm } from './pages/EventForm';
 import { ParticipantDashboard } from './pages/ParticipantDashboard';
 import { OrganizerDashboard } from './pages/OrganizerDashboard';
 import { EventAttendees } from './pages/EventAttendees';
+import { ForgotPassword, OrganizerSecurity, ResetPassword, VerifyEmail } from './pages/AccountSecurity';
 
 const organizerOnly = (el) => <ProtectedRoute role="organizer">{el}</ProtectedRoute>;
 
@@ -26,11 +27,15 @@ export default function App() {
             <Route path="/events/:eventId" element={<EventDetail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route path="/participant" element={<ProtectedRoute role="participant"><ParticipantDashboard /></ProtectedRoute>} />
             <Route path="/my-registrations" element={<Navigate to="/participant" replace />} />
 
             <Route path="/organizer" element={organizerOnly(<OrganizerDashboard />)} />
+            <Route path="/organizer/security" element={organizerOnly(<OrganizerSecurity />)} />
             <Route path="/organizer/events/new" element={organizerOnly(<EventForm />)} />
             <Route path="/organizer/events/:eventId/edit" element={organizerOnly(<EventForm />)} />
             <Route path="/organizer/events/:eventId/attendees" element={organizerOnly(<EventAttendees />)} />

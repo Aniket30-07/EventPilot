@@ -2,13 +2,20 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { homeFor } from '../lib/format';
+import { api } from '../lib/api';
 
 export const Login = () => {
-  const { user, login } = useAuth();
+  const { user, login, completeMfaLogin } = useAuth();
   const navigate = useNavigate();
-  const from = useLocation().state?.from;
+  const location = useLocation();
+  const from = location.state?.from;
+  const notice = location.state?.notice;
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
 
   if (user) return <Navigate to={homeFor(user)} replace />;
@@ -16,11 +23,33 @@ export const Login = () => {
   const submit = async (e) => {
     e?.preventDefault?.();
     setError('');
+    setErrorCode('');
     setBusy(true);
     try {
       const u = await login(form.email, form.password);
+      if (u.mfaRequired) {
+        setMfaRequired(true);
+        setError('');
+        setBusy(false);
+        return;
+      }
       // Only follow the "return to" path if this role may open it
-      const allowed = from && (u.role === 'organizer' ? !from.startsWith('/participant') : !from.startsWith('/organizer'));
+      const allowed = from && (u.user.role === 'organizer' ? !from.startsWith('/participant') : !from.startsWith('/organizer'));
+      navigate(allowed ? from : homeFor(u.user), { replace: true });
+    } catch (err) {
+      setError(err.message);
+      setErrorCode(err.code || '');
+      setBusy(false);
+    }
+  };
+
+  const submitMfa = async (e) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const u = await completeMfaLogin(mfaCode.trim());
+      const allowed = from && !from.startsWith('/participant');
       navigate(allowed ? from : homeFor(u), { replace: true });
     } catch (err) {
       setError(err.message);
@@ -28,57 +57,50 @@ export const Login = () => {
     }
   };
 
-  const handleQuickLogin = async (email, password) => {
-    setForm({ email, password });
+  const resendVerification = async () => {
     setError('');
-    setBusy(true);
+    setFeedback('');
+    setErrorCode('');
     try {
-      const u = await login(email, password);
-      const allowed = from && (u.role === 'organizer' ? !from.startsWith('/participant') : !from.startsWith('/organizer'));
-      navigate(allowed ? from : homeFor(u), { replace: true });
+      const result = await api('/auth/resend-verification', { method: 'POST', body: { email: form.email } });
+      setFeedback(result.message);
     } catch (err) {
       setError(err.message);
-      setBusy(false);
     }
   };
 
   return (
-    <form className="card form narrow" onSubmit={submit}>
-      <h2>Sign in</h2>
+    <div className="card form narrow account-card">
+      <span className="eyebrow">{mfaRequired ? 'ONE MORE STEP' : 'WELCOME BACK'}</span>
+      <h2>{mfaRequired ? 'Verify it’s you' : 'Sign in'}</h2>
+      {notice && <div className="alert info">{notice}</div>}
       {error && <div className="alert error">{error}</div>}
-      <label>Email
-        <input type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      </label>
-      <label>Password
-        <input type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      </label>
-      <button className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-      <p className="muted">New here? <Link to="/register">Create a participant account</Link></p>
-
-      <div className="demo-box">
-        <div className="demo-title">⚡ Quick Demo Accounts</div>
-        <p className="demo-desc">Click to instantly test dashboards without typing:</p>
-        <div className="demo-grid">
-          <button
-            type="button"
-            className="demo-btn"
-            disabled={busy}
-            onClick={() => handleQuickLogin('organizer1@eventpilot.dev', 'Password123!')}
-          >
-            <strong>👔 Demo Organizer</strong>
-            <span>organizer1@eventpilot.dev</span>
-          </button>
-          <button
-            type="button"
-            className="demo-btn"
-            disabled={busy}
-            onClick={() => handleQuickLogin('participant@eventpilot.dev', 'Password123!')}
-          >
-            <strong>🎟️ Demo Participant</strong>
-            <span>participant@eventpilot.dev</span>
-          </button>
-        </div>
-      </div>
-    </form>
+      {feedback && <div className="alert success">{feedback}</div>}
+      {mfaRequired ? (
+        <form className="form" onSubmit={submitMfa}>
+          <p className="muted">Enter a 6-digit code from your authenticator app, or use one of your recovery codes.</p>
+          <label>Authenticator or recovery code
+            <input required autoComplete="one-time-code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
+          </label>
+          <button className="btn" disabled={busy}>{busy ? 'Verifying…' : 'Verify and sign in'}</button>
+          <button className="link" type="button" onClick={() => { setMfaRequired(false); setMfaCode(''); setError(''); }}>Back to sign in</button>
+        </form>
+      ) : (
+        <form className="form" onSubmit={submit}>
+          <label>Email
+            <input type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </label>
+          <label>Password
+            <input type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </label>
+          <div className="account-form-links"><Link to="/forgot-password">Forgot password?</Link></div>
+          <button className="btn" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          {errorCode === 'EMAIL_NOT_VERIFIED' && (
+            <button type="button" className="btn ghost" onClick={resendVerification}>Resend verification email</button>
+          )}
+          <p className="muted account-bottom-link">New here? <Link to="/register">Create a participant account</Link></p>
+        </form>
+      )}
+    </div>
   );
 };

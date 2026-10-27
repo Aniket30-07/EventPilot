@@ -8,6 +8,13 @@ import { generateTicketCode } from '../utils/ticketGenerator.js';
 
 const run = async () => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Demo events and accounts cannot be seeded in production.');
+    }
+    const demoPassword = process.env.SEED_DEMO_PASSWORD;
+    if (!demoPassword || demoPassword.length < 12 || demoPassword.length > 72) {
+      throw new Error('Set SEED_DEMO_PASSWORD in backend/.env (12–72 characters) before seeding demo data.');
+    }
     await connectDB();
 
     // 1. Get or create Organizer
@@ -17,9 +24,13 @@ const run = async () => {
         name: 'Organizer One',
         email: 'organizer1@eventpilot.dev',
         role: 'organizer',
-        passwordHash: await User.hashPassword('Password123!'),
+        passwordHash: await User.hashPassword(demoPassword),
       });
       console.log('[Seed] Created organizer: organizer1@eventpilot.dev');
+    } else {
+      organizer.role = 'organizer';
+      organizer.passwordHash = await User.hashPassword(demoPassword);
+      await organizer.save();
     }
 
     // 2. Get or create Demo Participant
@@ -29,9 +40,12 @@ const run = async () => {
         name: 'Alex Participant',
         email: 'participant@eventpilot.dev',
         role: 'participant',
-        passwordHash: await User.hashPassword('Password123!'),
+        passwordHash: await User.hashPassword(demoPassword),
       });
       console.log('[Seed] Created demo participant: participant@eventpilot.dev');
+    } else {
+      participant.passwordHash = await User.hashPassword(demoPassword);
+      await participant.save();
     }
 
     // 3. Define curated events (Dates relative to Nov/Dec 2026)
@@ -171,8 +185,9 @@ const run = async () => {
     console.log('\n==========================================');
     console.log(' SEED COMPLETED SUCCESSFULLY');
     console.log('==========================================');
-    console.log(` Organizer Login:    organizer1@eventpilot.dev / Password123!`);
-    console.log(` Participant Login:  participant@eventpilot.dev / Password123! (has 2 registered tickets)`);
+    console.log(' Demo account password: the value configured in SEED_DEMO_PASSWORD');
+    console.log(' Organizer Login:    organizer1@eventpilot.dev');
+    console.log(' Participant Login:  participant@eventpilot.dev (has 2 registered tickets)');
     console.log(` Empty Dashboard:    Register any new user in UI (0 registrations)`);
     console.log(` Empty Category:     Filter by 'Sports' on discovery page (0 events)`);
     console.log('==========================================\n');

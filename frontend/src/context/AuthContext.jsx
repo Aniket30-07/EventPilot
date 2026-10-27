@@ -16,14 +16,18 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password) => {
     const d = await api('/auth/login', { method: 'POST', body: { email, password } });
+    if (d.user) setUser(d.user);
+    return d;
+  }, []);
+
+  const completeMfaLogin = useCallback(async (code) => {
+    const d = await api('/auth/login/mfa', { method: 'POST', body: { code } });
     setUser(d.user);
     return d.user;
   }, []);
 
   const register = useCallback(async (name, email, password) => {
-    const d = await api('/auth/register', { method: 'POST', body: { name, email, password } });
-    setUser(d.user);
-    return d.user;
+    return api('/auth/register', { method: 'POST', body: { name, email, password } });
   }, []);
 
   const logout = useCallback(async () => {
@@ -31,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, completeMfaLogin, register, logout }}>{children}</AuthContext.Provider>;
 };
 
 // eslint-disable-next-line react-refresh/only-export-components

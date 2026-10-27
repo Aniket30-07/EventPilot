@@ -12,22 +12,25 @@ export const Navbar = () => {
 
   return (
     <header className="navbar">
-      <Link to="/" className="brand">✈️ EventPilot</Link>
+      <Link to="/" className="brand"><span className="brand-mark" aria-hidden="true">✳</span>Event<span>Pilot</span></Link>
       <nav>
-        <NavLink to="/events">Explore Events</NavLink>
-        {user?.role === 'participant' && <NavLink to="/participant">My Dashboard</NavLink>}
-        {user?.role === 'organizer' && <NavLink to="/organizer">Organizer Dashboard</NavLink>}
+        <NavLink to="/events">Discover</NavLink>
+        {user?.role === 'participant' && <NavLink to="/participant">My tickets</NavLink>}
+        {user?.role === 'organizer' && <>
+          <NavLink to="/organizer">Your events</NavLink>
+          <NavLink to="/organizer/security">Security</NavLink>
+        </>}
       </nav>
       <div className="nav-user">
         {user ? (
           <>
-            <span className="nav-name">{user.name} <span className={`pill ${user.role}`}>{user.role}</span></span>
-            <button className="btn ghost sm" onClick={handleLogout}>Sign out</button>
+            <span className="nav-name"><span className="nav-avatar">{user.name?.slice(0, 1).toUpperCase()}</span><span className="nav-welcome">Hi, {user.name?.split(' ')[0]}</span></span>
+            <button className="btn ghost sm" onClick={handleLogout}>Sign out <span aria-hidden="true">↗</span></button>
           </>
         ) : (
           <>
             <Link to="/login" className="btn ghost sm">Sign in</Link>
-            <Link to="/register" className="btn sm">Sign up</Link>
+            <Link to="/register" className="btn sm">Join EventPilot <span aria-hidden="true">↗</span></Link>
           </>
         )}
       </div>
