@@ -293,16 +293,28 @@ npm run dev
 
 ## 8. Test Accounts & Evaluation Credentials
 
-All accounts are pre-seeded in `backend/src/scripts/resetAndSeed.js`:
+All accounts are pre-seeded in the database via `backend/src/scripts/resetAndSeed.js`. Additionally, the **Sign In** page features a **1-Click Role Fill** interface for evaluation convenience:
 
-| Role | Email | Password | Pre-Registered Activity |
+| Role / Entity | Email | Password | Pre-Registered Activity / Testing Scenario |
 |---|---|---|---|
-| **Lead Organiser** | `organiser1@gmail.com` | `organiser1@` | Event creation, bracket management, judging, co-organizer management |
-| **Participant 1** | `user1@gmail.com` | `user1@` | Registered in Live Hackathon (Ready to submit) |
-| **Participant 2** | `user2@gmail.com` | `user2@` | Registered in Live Hackathon |
-| **Participant 3** | `user3@gmail.com` | `user3@` | Registered in Cloud Architecture Seminar |
-| **Cricket Player 1** | `player1@gmail.com` | `player1@` | Ready to receive & accept squad invitations |
-| **Cricket Players 2–11** | `player2@gmail.com` .. `player11@gmail.com` | `player2@` .. `player11@` | Playing XI squad members |
+| **Lead Organiser (Root)** | `organiser1@gmail.com` | `organiser1@` | Full governance, event creation, bracket evaluation, co-organizer management |
+| **Lead Organiser (Alias)** | `organiser@gmail.com` | `organiser@` | Secondary root alias |
+| **Team Alpha Captain** | `user1@gmail.com` | `user1@` | Live Hackathon (Ends in 1 hr): Captain of Team Alpha with **project submitted** |
+| **Team Alpha Devs** | `user2@gmail.com` .. `user4@gmail.com` | `user2@` .. `user4@` | Confirmed squad members of Team Alpha (4/4 quorum) |
+| **Team Beta Captain** | `user5@gmail.com` | `user5@` | Live Hackathon: Captain of Team Beta (4/4 quorum) **ready to submit project** |
+| **Team Beta Devs** | `user6@gmail.com` .. `user8@gmail.com` | `user6@` .. `user8@` | Confirmed squad members of Team Beta |
+| **Participant 9** | `user9@gmail.com` | `user9@` | Concluded Hackathon: **Submitted project evaluated with 93.5/100** |
+| **Participant 10** | `user10@gmail.com` | `user10@` | Concluded Hackathon: Registered but **did not submit** (ready for results publish) |
+| **Cricket Captain** | `player1@gmail.com` | `player1@` | Cricket 1v1 Final: Captain of **Thunder Strikers XI** |
+| **Cricket XI Players** | `player2@gmail.com` .. `player15@gmail.com` | `player2@` .. `player15@` | 14 squad players confirmed in Playing XI & squad |
+| **Guest Evaluator** | `guest.evaluator@gmail.com` | `guest@` | Clean user state with 0 registrations (test fresh ticket flow) |
+| **New Participant** | `newuser@gmail.com` | `newuser@` | Fresh participant account |
+
+### Curated Database Scenarios:
+1. **Live Hackathon (Ends in 1 Hour)**: 2 teams of 4 members each (`teamMode: 'team'`, quorum 4/4). Team Alpha has submitted their project; Team Beta is ready to submit during the final hour.
+2. **Concluded Hackathon (Ended 1 Day Ago)**: `user9` has an evaluated project (93.5/100); `user10` did not submit. Organizers can evaluate or publish leaderboard standings.
+3. **Cricket 1v1 Final (Championship Match)**: `knockout_2` format between Thunder Strikers XI (15 confirmed players: `player1` to `player15`) and Royal Challengers XI.
+
 
 ---
 
