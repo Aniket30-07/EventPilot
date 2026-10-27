@@ -158,6 +158,25 @@ const eventSchema = new mongoose.Schema(
         },
       ],
     },
+    hackathonConfig: {
+      teamMode: {
+        type: String,
+        enum: ['solo', 'team'],
+        default: 'team',
+      },
+      maxTeams: {
+        type: Number,
+        default: 50,
+      },
+      teamSize: {
+        type: Number,
+        default: 4,
+      },
+      requiredMembers: {
+        type: Number,
+        default: 4,
+      },
+    },
   },
   {
     timestamps: true,

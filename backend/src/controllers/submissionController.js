@@ -55,6 +55,28 @@ export const submitProject = async (req, res, next) => {
       return fail(res, 403, 'You must have a confirmed registration for this hackathon to submit a project.');
     }
 
+    const captainRegId = registration.isCaptain ? registration._id : registration.captainRegistrationId;
+    const isTeamHackathon = Boolean(registration.teamName && captainRegId);
+
+    // Team qualification check:
+    // If hackathon is configured as team-based, verify required members accepted before deadline
+    if (isTeamHackathon && event.hackathonConfig?.teamMode === 'team') {
+      const required = event.hackathonConfig?.requiredMembers || 4;
+      const confirmedCount = await Registration.countDocuments({
+        eventId: event._id,
+        status: 'confirmed',
+        $or: [{ _id: captainRegId }, { captainRegistrationId: captainRegId }],
+      });
+
+      if (now > new Date(event.registrationDeadline) && confirmedCount < required) {
+        return fail(
+          res,
+          400,
+          `Your team "${registration.teamName}" is disqualified (${confirmedCount}/${required} members confirmed). Teams must reach all ${required} required members before the registration deadline to compete.`
+        );
+      }
+    }
+
     const { projectName, tagline, description, githubUrl, deployedUrl, demoVideoUrl } = req.body || {};
 
     if (!projectName || typeof projectName !== 'string' || projectName.trim().length < 2) {
@@ -79,6 +101,8 @@ export const submitProject = async (req, res, next) => {
     const submissionData = {
       eventId: event._id,
       participantId: req.user._id,
+      captainRegistrationId: captainRegId || null,
+      teamName: registration.teamName || '',
       ticketCode: registration.ticketCode,
       projectName: projectName.trim(),
       tagline: (tagline || '').trim(),
@@ -88,15 +112,19 @@ export const submitProject = async (req, res, next) => {
       demoVideoUrl: cleanVideo,
     };
 
+    const filter = isTeamHackathon
+      ? { eventId: event._id, captainRegistrationId: captainRegId }
+      : { eventId: event._id, participantId: req.user._id };
+
     const submission = await Submission.findOneAndUpdate(
-      { eventId: event._id, participantId: req.user._id },
+      filter,
       { $set: submissionData },
       { new: true, upsert: true, runValidators: true }
     );
 
     res.status(200).json({
       success: true,
-      message: 'Project submitted successfully!',
+      message: isTeamHackathon ? `Project submitted successfully for team "${registration.teamName}"!` : 'Project submitted successfully!',
       submission,
     });
   } catch (error) {
@@ -104,20 +132,38 @@ export const submitProject = async (req, res, next) => {
   }
 };
 
-// GET /api/events/:eventId/submissions/mine (Participant gets own submission)
+// GET /api/events/:eventId/submissions/mine (Participant gets team or own submission)
 export const getMySubmission = async (req, res, next) => {
   try {
-    const submission = await Submission.findOne({
+    const reg = await Registration.findOne({
       eventId: req.params.eventId,
       participantId: req.user._id,
+      status: 'confirmed',
     });
+    if (!reg) return res.status(200).json({ success: true, submission: null });
+
+    const captainRegId = reg.isCaptain ? reg._id : reg.captainRegistrationId;
+    let submission = null;
+    if (captainRegId) {
+      submission = await Submission.findOne({
+        eventId: req.params.eventId,
+        captainRegistrationId: captainRegId,
+      });
+    }
+    if (!submission) {
+      submission = await Submission.findOne({
+        eventId: req.params.eventId,
+        participantId: req.user._id,
+      });
+    }
+
     res.status(200).json({ success: true, submission });
   } catch (error) {
     next(error);
   }
 };
 
-// GET /api/events/:eventId/submissions (Organizer gets all submissions)
+// GET /api/events/:eventId/submissions (Organizer gets all submissions with team details)
 export const getEventSubmissions = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.eventId);
@@ -128,10 +174,32 @@ export const getEventSubmissions = async (req, res, next) => {
       .populate('participantId', 'name email')
       .sort({ score: -1, createdAt: 1 });
 
+    const enriched = await Promise.all(
+      submissions.map(async (s) => {
+        let teamMembers = [];
+        if (s.captainRegistrationId) {
+          const members = await Registration.find({
+            eventId: event._id,
+            status: 'confirmed',
+            $or: [{ _id: s.captainRegistrationId }, { captainRegistrationId: s.captainRegistrationId }],
+          }).populate('participantId', 'name email');
+          teamMembers = members.map((m) => ({
+            name: m.participantId?.name,
+            email: m.participantId?.email,
+            isCaptain: m.isCaptain,
+          }));
+        }
+        return {
+          ...s.toObject(),
+          teamMembers,
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
       resultsPublished: Boolean(event.resultsPublished),
-      submissions,
+      submissions: enriched,
     });
   } catch (error) {
     next(error);
@@ -230,25 +298,43 @@ export const getLeaderboard = async (req, res, next) => {
       .populate('participantId', 'name')
       .sort({ score: -1, evaluatedAt: 1 });
 
-    const leaderboard = submissions.map((s, index) => ({
-      rank: index + 1,
-      submissionId: s._id,
-      projectName: s.projectName,
-      tagline: s.tagline,
-      description: s.description,
-      githubUrl: s.githubUrl,
-      deployedUrl: s.deployedUrl,
-      demoVideoUrl: s.demoVideoUrl,
-      ticketCode: s.ticketCode,
-      submitterName: s.participantId?.name || 'Anonymous',
-      score: s.score,
-      feedback: s.feedback,
-    }));
+    const enrichedLeaderboard = await Promise.all(
+      submissions.map(async (s, index) => {
+        let teamMembers = [];
+        if (s.captainRegistrationId) {
+          const members = await Registration.find({
+            eventId: event._id,
+            status: 'confirmed',
+            $or: [{ _id: s.captainRegistrationId }, { captainRegistrationId: s.captainRegistrationId }],
+          }).populate('participantId', 'name email');
+          teamMembers = members.map((m) => ({
+            name: m.participantId?.name,
+            isCaptain: m.isCaptain,
+          }));
+        }
+        return {
+          rank: index + 1,
+          submissionId: s._id,
+          projectName: s.projectName,
+          tagline: s.tagline,
+          description: s.description,
+          githubUrl: s.githubUrl,
+          deployedUrl: s.deployedUrl,
+          demoVideoUrl: s.demoVideoUrl,
+          ticketCode: s.ticketCode,
+          teamName: s.teamName,
+          teamMembers,
+          submitterName: s.participantId?.name || 'Anonymous',
+          score: s.score,
+          feedback: s.feedback,
+        };
+      })
+    );
 
     res.status(200).json({
       success: true,
       resultsPublished: Boolean(event.resultsPublished),
-      leaderboard,
+      leaderboard: enrichedLeaderboard,
     });
   } catch (error) {
     next(error);

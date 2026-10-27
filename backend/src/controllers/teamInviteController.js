@@ -136,12 +136,20 @@ export const acceptTeamInvite = async (req, res, next) => {
     }
 
     const now = new Date();
+    // Check registration deadline first
+    if (now > new Date(event.registrationDeadline)) {
+      invite.status = 'declined';
+      invite.respondedAt = now;
+      await invite.save();
+      return fail(res, 400, 'Registration and team formation deadline has passed. Invitations can no longer be accepted.');
+    }
+
     // If the event/tournament has already started or concluded
     if (now >= new Date(event.startAt)) {
       invite.status = 'declined';
       invite.respondedAt = now;
       await invite.save();
-      return fail(res, 400, 'Registration is closed. This tournament has already begun or concluded.');
+      return fail(res, 400, 'Registration is closed. This event has already begun or concluded.');
     }
 
     // Check if already registered
@@ -157,7 +165,7 @@ export const acceptTeamInvite = async (req, res, next) => {
       return fail(res, 400, 'You are already registered for this event.');
     }
 
-    // Squad limit check: max 15 members (captain + players)
+    // Squad limit check
     const captainRegId = invite.registrationId;
     const currentSquadCount = await Registration.countDocuments({
       eventId: event._id,
@@ -165,13 +173,17 @@ export const acceptTeamInvite = async (req, res, next) => {
       $or: [{ _id: captainRegId }, { captainRegistrationId: captainRegId }],
     });
 
-    const MAX_SQUAD_LIMIT = 15;
+    const isHackathon = event.category === 'hackathon';
+    const MAX_SQUAD_LIMIT = isHackathon
+      ? (event.hackathonConfig?.teamSize || event.hackathonConfig?.requiredMembers || 4)
+      : (event.category === 'sports' && event.sportsData?.sportType === 'cricket' ? 15 : 15);
+
     if (currentSquadCount >= MAX_SQUAD_LIMIT) {
       // Squad is full, decline invite and clear from pending
       invite.status = 'declined';
       invite.respondedAt = now;
       await invite.save();
-      return fail(res, 400, 'Team squad is full! All 15 player slots have been filled.');
+      return fail(res, 400, `Team squad is full! All ${MAX_SQUAD_LIMIT} member slots have been filled.`);
     }
 
     // Create participant registration linked to team
@@ -272,11 +284,23 @@ export const getEventSquad = async (req, res, next) => {
       .limit(20)
       .lean();
 
+    const isHackathon = event.category === 'hackathon';
+    const requiredMembers = isHackathon ? (event.hackathonConfig?.requiredMembers || 4) : 11;
+    const maxTeamSize = isHackathon ? (event.hackathonConfig?.teamSize || event.hackathonConfig?.requiredMembers || 4) : 15;
+    const deadlinePassed = new Date() > new Date(event.registrationDeadline);
+    const isQualified = confirmedPlayers.length >= requiredMembers;
+    const isDisqualified = deadlinePassed && !isQualified;
+
     res.status(200).json({
       success: true,
       isMember: true,
       isCaptain: userReg.isCaptain,
       teamName: userReg.teamName,
+      requiredMembers,
+      maxTeamSize,
+      isQualified,
+      isDisqualified,
+      deadlinePassed,
       captain: {
         id: captainReg.participantId?._id,
         name: captainReg.participantId?.name,

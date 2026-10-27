@@ -197,6 +197,11 @@ export const OrganizerSubmissions = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 800, color: 'var(--accent)' }}>#{idx + 1}</span>
                     <h3 style={{ margin: 0 }}>{sub.projectName}</h3>
+                    {sub.teamName && (
+                      <span className="pill" style={{ background: 'rgba(99,102,241,.15)', color: '#818cf8', fontWeight: 700 }}>
+                        👥 Team: {sub.teamName}
+                      </span>
+                    )}
                     <span className="ticket-code-badge">{sub.ticketCode}</span>
                     <span className={`pill ${sub.score !== null ? 'ok' : 'draft'}`}>
                       {sub.score !== null ? `Score: ${sub.score}/100` : 'Pending Score'}
@@ -205,8 +210,13 @@ export const OrganizerSubmissions = () => {
                   {sub.tagline && <p style={{ color: 'var(--muted)', fontSize: '.88rem', marginTop: '.25rem' }}>{sub.tagline}</p>}
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '.82rem', color: 'var(--muted)' }}>
-                  <div>By <strong>{sub.participantId?.name}</strong></div>
+                  <div>{sub.teamName ? 'Captain / Submitter: ' : 'By '}<strong>{sub.participantId?.name}</strong></div>
                   <div>{sub.participantId?.email}</div>
+                  {sub.teamMembers?.length > 0 && (
+                    <div style={{ marginTop: '.25rem', fontSize: '.76rem', color: 'var(--text)' }}>
+                      <strong>Squad:</strong> {sub.teamMembers.map((m) => m.name).join(', ')}
+                    </div>
+                  )}
                 </div>
               </div>
 

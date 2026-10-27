@@ -10,7 +10,10 @@ const toLocalInput = (iso) => {
 };
 
 const EMPTY = {
-  title: '', description: '', category: 'hackathon', sportType: 'football', tournamentFormat: 'knockout_4', mode: 'in-person', venue: '', onlineLink: '',
+  title: '', description: '', category: 'hackathon',
+  sportType: 'football', tournamentFormat: 'knockout_4',
+  hackathonTeamMode: 'team', hackathonTeamSize: 4, hackathonRequiredMembers: 4,
+  mode: 'in-person', venue: '', onlineLink: '',
   startAt: '', endAt: '', registrationDeadline: '', capacity: 50,
 };
 
@@ -36,6 +39,9 @@ export const EventForm = () => {
           ...EMPTY, ...event,
           sportType: event.sportsData?.sportType || 'football',
           tournamentFormat: event.sportsData?.tournamentFormat || 'knockout_4',
+          hackathonTeamMode: event.hackathonConfig?.teamMode || 'team',
+          hackathonTeamSize: event.hackathonConfig?.teamSize || 4,
+          hackathonRequiredMembers: event.hackathonConfig?.requiredMembers || 4,
           startAt: toLocalInput(event.startAt),
           endAt: toLocalInput(event.endAt),
           registrationDeadline: toLocalInput(event.registrationDeadline),
@@ -63,6 +69,7 @@ export const EventForm = () => {
     setBusy(true);
     try {
       const isSports = form.category === 'sports';
+      const isHackathon = form.category === 'hackathon';
       const body = {
         title: form.title, description: form.description, category: form.category, mode: form.mode,
         venue: form.venue, onlineLink: form.onlineLink, capacity: Number(form.capacity),
@@ -74,6 +81,14 @@ export const EventForm = () => {
             sportType: form.sportType || 'football',
             tournamentFormat: form.tournamentFormat || 'knockout_4',
             maxTeams: Number(form.capacity),
+          },
+        } : {}),
+        ...(isHackathon ? {
+          hackathonConfig: {
+            teamMode: form.hackathonTeamMode || 'team',
+            maxTeams: Number(form.capacity),
+            teamSize: Number(form.hackathonTeamSize) || 4,
+            requiredMembers: Number(form.hackathonRequiredMembers) || 4,
           },
         } : {}),
       };
@@ -98,6 +113,7 @@ export const EventForm = () => {
 
   const isDraft = !editing || status === 'draft';
   const isSports = form.category === 'sports';
+  const isHackathon = form.category === 'hackathon';
   const isChess = isSports && form.sportType === 'chess';
 
   return (
@@ -115,7 +131,7 @@ export const EventForm = () => {
             setForm({
               ...form,
               category: cat,
-              capacity: cat === 'sports' ? 4 : form.capacity || 50,
+              capacity: cat === 'sports' ? 4 : cat === 'hackathon' ? 50 : form.capacity || 50,
             });
           }}>
             {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -128,6 +144,44 @@ export const EventForm = () => {
           </select>
         </label>
       </div>
+
+      {isHackathon && (
+        <div className="two-col" style={{ background: 'rgba(99, 102, 241, 0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.2)', marginBottom: '1rem' }}>
+          <label>Hackathon Participation Format
+            <select value={form.hackathonTeamMode} onChange={(e) => {
+              const mode = e.target.value;
+              setForm({
+                ...form,
+                hackathonTeamMode: mode,
+                capacity: mode === 'team' ? 50 : form.capacity || 100,
+              });
+            }}>
+              <option value="team">👥 Team-Based Hackathon (Squads + 1 Submission Per Team)</option>
+              <option value="solo">👤 Solo Hackathon (Individual Developers)</option>
+            </select>
+          </label>
+          {form.hackathonTeamMode === 'team' ? (
+            <label>Required Team Size (Qualification Quorum)
+              <select value={form.hackathonRequiredMembers} onChange={(e) => {
+                const val = Number(e.target.value);
+                setForm({ ...form, hackathonRequiredMembers: val, hackathonTeamSize: val });
+              }}>
+                <option value={2}>2 Members per Team</option>
+                <option value={3}>3 Members per Team</option>
+                <option value={4}>4 Members per Team (Standard)</option>
+                <option value={5}>5 Members per Team</option>
+              </select>
+              <span style={{ fontSize: '.76rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
+                Teams must reach this number of accepted members before deadline to qualify.
+              </span>
+            </label>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: '.85rem', color: 'var(--muted)' }}>
+              Individual developers register and submit projects independently.
+            </div>
+          )}
+        </div>
+      )}
 
       {isSports && (
         <div className="two-col">
@@ -169,11 +223,20 @@ export const EventForm = () => {
       <div className="two-col">
         <label>Registration deadline<input type="datetime-local" required value={form.registrationDeadline} onChange={set('registrationDeadline')} /></label>
         <label>
-          {isSports ? (isChess ? 'Max Players (1v1 Competitor Limit)' : 'Max Teams (Tournament Slot Limit)') : 'Capacity (Seats / Tickets)'}
+          {isSports
+            ? (isChess ? 'Max Players (1v1 Competitor Limit)' : 'Max Teams (Tournament Slot Limit)')
+            : (isHackathon && form.hackathonTeamMode === 'team')
+              ? 'Max Teams (Team Capacity Limit, e.g. 50 Teams)'
+              : 'Capacity (Seats / Tickets)'}
           <input type="number" required min={1} max={100000} step={1} value={form.capacity} onChange={set('capacity')} />
           {isSports && (
             <span style={{ fontSize: '.76rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
               Each registration takes 1 {isChess ? 'player' : 'team'} slot. Registration closes once limit is reached.
+            </span>
+          )}
+          {isHackathon && form.hackathonTeamMode === 'team' && (
+            <span style={{ fontSize: '.76rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
+              Max number of teams allowed to register. Once all slots are taken, registration will show &quot;No seats available&quot;.
             </span>
           )}
         </label>

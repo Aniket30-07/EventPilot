@@ -95,7 +95,13 @@ export const getEventById = async (req, res, next) => {
     if (req.user?.role === 'participant') {
       myRegistration = await Registration.findOne({ eventId: event._id, participantId: req.user._id });
       if (event.category === 'hackathon') {
-        mySubmission = await Submission.findOne({ eventId: event._id, participantId: req.user._id });
+        const captainRegId = myRegistration?.isCaptain ? myRegistration._id : myRegistration?.captainRegistrationId;
+        if (captainRegId) {
+          mySubmission = await Submission.findOne({ eventId: event._id, captainRegistrationId: captainRegId });
+        }
+        if (!mySubmission) {
+          mySubmission = await Submission.findOne({ eventId: event._id, participantId: req.user._id });
+        }
       }
     }
     // The private meeting link is only shown to the owner and to confirmed registrants.
@@ -116,6 +122,7 @@ export const createEvent = async (req, res, next) => {
     if (err) return fail(res, 400, err);
 
     const sportsData = body.sportsData && typeof body.sportsData === 'object' ? body.sportsData : undefined;
+    const hackathonConfig = body.hackathonConfig && typeof body.hackathonConfig === 'object' ? body.hackathonConfig : undefined;
 
     const event = await Event.create({
       ...data,
@@ -127,6 +134,7 @@ export const createEvent = async (req, res, next) => {
       organizerId: req.user._id,
       status: 'draft',
       ...(sportsData ? { sportsData } : {}),
+      ...(hackathonConfig ? { hackathonConfig } : {}),
     });
     res.status(201).json({ success: true, message: 'Event saved as draft.', event });
   } catch (error) {
@@ -160,6 +168,10 @@ export const updateEvent = async (req, res, next) => {
 
     if (req.body?.sportsData && typeof req.body.sportsData === 'object') {
       event.sportsData = { ...event.sportsData?.toObject(), ...req.body.sportsData };
+    }
+
+    if (req.body?.hackathonConfig && typeof req.body.hackathonConfig === 'object') {
+      event.hackathonConfig = { ...(event.hackathonConfig?.toObject ? event.hackathonConfig.toObject() : event.hackathonConfig), ...req.body.hackathonConfig };
     }
 
     await event.save();

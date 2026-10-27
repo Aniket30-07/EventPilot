@@ -7,8 +7,18 @@ import {
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
-const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false });
-const recoveryLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false });
+const loginLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === 'development' ? 1000 : 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
+const recoveryLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: process.env.NODE_ENV === 'development' ? 1000 : 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
 
 router.post('/register', recoveryLimit, register);
 router.post('/login', loginLimit, login);

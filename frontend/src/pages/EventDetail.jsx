@@ -157,8 +157,9 @@ export const EventDetail = () => {
     squadSize: 11,
     playerNotes: '',
   });
+  const [hackathonTeamName, setHackathonTeamName] = useState('');
 
-  // Sports Team Squad & Invite State
+  // Team Squad & Invite State (Sports & Team Hackathons)
   const [squadData, setSquadData] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -204,8 +205,11 @@ export const EventDetail = () => {
         setMaxTeamsState(res.event.sportsData.maxTeams || res.event.capacity || 4);
       }
 
-      // If Sports event & participant is registered, fetch squad roster
-      if (res.event?.category === 'sports' && res.myRegistration?.status === 'confirmed') {
+      // If Sports or Team Hackathon & participant is registered, fetch squad roster
+      const isTeamHackathon = res.event?.category === 'hackathon' && res.event?.hackathonConfig?.teamMode !== 'solo';
+      const isSports = res.event?.category === 'sports';
+
+      if ((isSports || isTeamHackathon) && res.myRegistration?.status === 'confirmed') {
         try {
           const sqRes = await api(`/events/${eventId}/squad`);
           setSquadData(sqRes);
@@ -452,6 +456,7 @@ export const EventDetail = () => {
   };
 
   const isHackathon = event.category === 'hackathon';
+  const isTeamHackathon = isHackathon && event.hackathonConfig?.teamMode !== 'solo';
   const isConferenceOrWebinar = ['conference', 'webinar', 'workshop'].includes(event.category);
   const isSports = event.category === 'sports';
   const currentSportType = event.sportsData?.sportType || 'football';
@@ -496,7 +501,7 @@ export const EventDetail = () => {
           <div className="ticket-code">{myRegistration.ticketCode}</div>
           {myRegistration.teamName && (
             <div style={{ fontSize: '.88rem', marginTop: '.25rem' }}>
-              <strong>Registered As:</strong> {myRegistration.teamName} {myRegistration.squadSize > 1 ? `(${myRegistration.squadSize} squad members)` : ''}
+              <strong>Registered Team:</strong> {myRegistration.teamName} {myRegistration.roleInTeam === 'captain' ? '(Captain 👑)' : '(Member)'}
             </div>
           )}
           {myRegistration.checkedInAt && <span className="muted">Checked in {fmtDate(myRegistration.checkedInAt)}</span>}
@@ -516,11 +521,57 @@ export const EventDetail = () => {
     registerBox = <p className="muted">Registration closed on {fmtDate(event.registrationDeadline)}.</p>;
   } else if (full) {
     registerBox = (
-      <p className="danger-text">
-        {isSports
-          ? `Tournament Full: All ${event.capacity} ${currentSportType === 'chess' ? 'competitor' : 'team'} slots have been filled.`
-          : 'This event is full.'}
-      </p>
+      <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '1rem', textAlign: 'center' }}>
+        <p className="danger-text" style={{ margin: 0, fontWeight: 600 }}>
+          {isSports
+            ? `Tournament Full: All ${event.capacity} ${currentSportType === 'chess' ? 'competitor' : 'team'} slots have been filled. No seats available.`
+            : isTeamHackathon
+              ? `Hackathon Full: All ${event.capacity} team slots have been filled. No seats available.`
+              : 'No seats available: This event has reached maximum capacity.'}
+        </p>
+      </div>
+    );
+  } else if (isTeamHackathon) {
+    const requiredTeamMembers = event.hackathonConfig?.requiredMembers || 4;
+    registerBox = (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          register({ teamName: hackathonTeamName, squadSize: requiredTeamMembers });
+        }}
+        style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+          <strong style={{ fontSize: '1.05rem' }}>👥 Register Hackathon Team</strong>
+          <span className="pill">Squad of {requiredTeamMembers} Required</span>
+          <span className="pill ok" style={{ fontSize: '.78rem' }}>
+            {event.remainingSeats} of {event.capacity} team slots remaining
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: '.84rem', margin: '0' }}>
+          Register your team to immediately enter the competition as <strong>Team Captain</strong>. You can then invite your teammates to join by email. All {requiredTeamMembers} members must accept before the registration deadline to qualify!
+        </p>
+        <div className="two-col">
+          <label>Team Name *
+            <input
+              required
+              placeholder="e.g. CodeWarriors, ByteForce"
+              value={hackathonTeamName}
+              onChange={(e) => setHackathonTeamName(e.target.value)}
+            />
+          </label>
+          <label>Required Team Quorum
+            <input
+              type="text"
+              disabled
+              value={`${requiredTeamMembers} Members (All must accept to qualify)`}
+            />
+          </label>
+        </div>
+        <button className="btn" disabled={busy} style={{ alignSelf: 'flex-start', marginTop: '.25rem' }}>
+          {busy ? 'Registering Team…' : 'Register Team & Enter Hackathon 🚀'}
+        </button>
+      </form>
     );
   } else if (isSports) {
     const isCricket = currentSportType === 'cricket';
@@ -645,20 +696,49 @@ export const EventDetail = () => {
       {/* Participant Registration Card */}
       {!isOwner && registerBox && <div className="card">{registerBox}</div>}
 
-      {/* ==================== TEAM SQUAD & ROSTER (SPORTS) ==================== */}
+      {/* ==================== TEAM SQUAD & ROSTER (SPORTS & TEAM HACKATHONS) ==================== */}
       {squadData?.isMember && (
         <div className="feature-card" style={{ marginTop: '1.25rem' }}>
           <div className="feature-header">
             <div>
-              <h3>🏏 {squadData.teamName} Squad Roster</h3>
+              <h3>{isSports ? '🏏' : '👥'} Team &ldquo;{squadData.teamName}&rdquo; Roster</h3>
               <p className="feature-desc">
-                Official Playing XI team members and squad invitations for this tournament.
+                {isSports
+                  ? 'Official tournament squad members and invitations.'
+                  : `Official team squad for this hackathon. Minimum ${squadData.requiredMembers} members required to qualify. Exactly one project submission per team.`}
               </p>
             </div>
-            <span className="pill ok" style={{ fontSize: '.85rem', fontWeight: 700 }}>
-              {squadData.confirmedPlayers?.length || 1} / 11 Confirmed Squad
-            </span>
+            {squadData.isDisqualified ? (
+              <span className="pill danger" style={{ fontSize: '.85rem', fontWeight: 700 }}>
+                ❌ Disqualified (Incomplete Squad)
+              </span>
+            ) : squadData.isQualified ? (
+              <span className="pill ok" style={{ fontSize: '.85rem', fontWeight: 700 }}>
+                ✅ Qualified & Confirmed ({squadData.confirmedPlayers?.length || 1}/{squadData.requiredMembers})
+              </span>
+            ) : (
+              <span className="pill" style={{ fontSize: '.85rem', fontWeight: 700, background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>
+                ⏳ Team Forming ({squadData.confirmedPlayers?.length || 1}/{squadData.requiredMembers} confirmed)
+              </span>
+            )}
           </div>
+
+          {/* Qualification Status Banner */}
+          {squadData.isDisqualified && (
+            <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.35)', color: '#fca5a5', padding: '.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '.86rem' }}>
+              ⚠️ <strong>Team Disqualified:</strong> This team failed to have all {squadData.requiredMembers} required members accept invitations before the registration deadline ({fmtDate(event.registrationDeadline)}). Project submissions are disabled.
+            </div>
+          )}
+          {!squadData.isDisqualified && !squadData.isQualified && (
+            <div style={{ background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.35)', color: '#fcd34d', padding: '.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '.86rem' }}>
+              ⏳ <strong>Action Needed:</strong> {squadData.requiredMembers - (squadData.confirmedPlayers?.length || 1)} more member{squadData.requiredMembers - (squadData.confirmedPlayers?.length || 1) === 1 ? '' : 's'} must accept their invitation before the registration deadline ({fmtDate(event.registrationDeadline)}) for your team to be qualified.
+            </div>
+          )}
+          {squadData.isQualified && (
+            <div style={{ background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.35)', color: '#6ee7b7', padding: '.75rem 1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '.86rem' }}>
+              ✨ <strong>Team Qualified:</strong> All {squadData.requiredMembers} required members have confirmed! Your team is fully qualified to build and submit your project.
+            </div>
+          )}
 
           {/* Squad Members Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '.65rem', marginBottom: '1.25rem' }}>
@@ -683,7 +763,7 @@ export const EventDetail = () => {
                 <div key={idx} style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.3)', borderRadius: '8px', padding: '.75rem .9rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <strong style={{ color: '#fff' }}>{p.name}</strong>
-                    <span className="pill ok" style={{ fontSize: '.72rem' }}>Player ✓</span>
+                    <span className="pill ok" style={{ fontSize: '.72rem' }}>Member ✓</span>
                   </div>
                   <span style={{ fontSize: '.8rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
                     {p.email}
@@ -704,16 +784,16 @@ export const EventDetail = () => {
                     <span className="pill" style={{ fontSize: '.72rem', background: 'rgba(245,158,11,.15)', color: '#f59e0b' }}>⏳ Pending</span>
                   </div>
                   <span style={{ fontSize: '.8rem', color: 'var(--muted)', display: 'block', marginTop: '.2rem' }}>
-                    Request sent to player's dashboard
+                    Invite sent to participant dashboard
                   </span>
                 </div>
               ))}
           </div>
 
           {/* Captain Invite Box */}
-          {squadData.isCaptain && (
+          {squadData.isCaptain && !deadlinePassed && (
             <div style={{ background: 'rgba(0,0,0,.25)', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem' }}>
-              <h4 style={{ margin: '0 0 .5rem', fontSize: '.95rem' }}>Send Squad Invitation to Players</h4>
+              <h4 style={{ margin: '0 0 .5rem', fontSize: '.95rem' }}>Send Team Invitation to Participants</h4>
               <p className="muted" style={{ fontSize: '.82rem', marginBottom: '.75rem' }}>
                 Enter a registered participant's email. A notification will appear on their dashboard with <strong>[Accept]</strong> and <strong>[Decline]</strong> buttons to join your team.
               </p>
@@ -721,7 +801,7 @@ export const EventDetail = () => {
                 <input
                   style={{ flex: 1, minWidth: '220px' }}
                   type="email"
-                  placeholder="e.g. player1@gmail.com"
+                  placeholder="e.g. teammate@gmail.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
@@ -733,25 +813,27 @@ export const EventDetail = () => {
                 >
                   {inviting ? 'Sending…' : '＋ Send Request'}
                 </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={inviting}
-                  title="Automatically send requests to player1@gmail.com through player11@gmail.com"
-                  onClick={handleInviteAllCricketSquad}
-                >
-                  ⚡ Invite 11 Squad Players (player1@ .. player11@)
-                </button>
+                {isSports && currentSportType === 'cricket' && (
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={inviting}
+                    title="Automatically send requests to player1@gmail.com through player11@gmail.com"
+                    onClick={handleInviteAllCricketSquad}
+                  >
+                    ⚡ Invite 11 Squad Players (player1@ .. player11@)
+                  </button>
+                )}
               </div>
 
               {/* Quick Suggestion Chips */}
               {squadData.suggestedUsers?.length > 0 && (
                 <div style={{ marginTop: '.65rem' }}>
                   <span style={{ fontSize: '.78rem', color: 'var(--muted)', display: 'block', marginBottom: '.35rem' }}>
-                    Quick Add Existing Players:
+                    Quick Add Existing Users:
                   </span>
                   <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
-                    {squadData.suggestedUsers.slice(0, 11).map((su) => (
+                    {squadData.suggestedUsers.slice(0, 8).map((su) => (
                       <button
                         key={su._id}
                         type="button"
@@ -817,9 +899,19 @@ export const EventDetail = () => {
                           <div className="project-title">{item.projectName}</div>
                           {item.tagline && <div className="project-tagline">{item.tagline}</div>}
                           <div className="project-meta">
+                            {item.teamName && (
+                              <span className="pill" style={{ marginRight: '.4rem', background: 'rgba(99,102,241,.15)', color: '#818cf8', fontWeight: 700 }}>
+                                👥 Team: {item.teamName}
+                              </span>
+                            )}
                             <span>By <strong>{item.submitterName}</strong></span>
                             <span className="ticket-code-badge">{item.ticketCode}</span>
                           </div>
+                          {item.teamMembers?.length > 0 && (
+                            <div style={{ marginTop: '.25rem', fontSize: '.78rem', color: 'var(--muted)' }}>
+                              Members: {item.teamMembers.map((m) => m.name).join(', ')}
+                            </div>
+                          )}
                           {item.feedback && (
                             <div style={{ marginTop: '.35rem', fontSize: '.8rem', color: 'var(--muted)', fontStyle: 'italic' }}>
                               “{item.feedback}”
@@ -906,7 +998,15 @@ export const EventDetail = () => {
                 </div>
               )}
 
-              {isUpcoming && !mySubmission ? (
+              {squadData?.isDisqualified ? (
+                <div style={{ padding: '1.5rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '10px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '.35rem' }}>❌</span>
+                  <h4 style={{ margin: '0 0 .35rem', color: '#f87171' }}>Project Submissions Locked (Team Disqualified)</h4>
+                  <p className="muted" style={{ margin: 0, fontSize: '.9rem' }}>
+                    Your team &ldquo;{myRegistration.teamName}&rdquo; did not reach the required {squadData?.requiredMembers || 4} confirmed members before the registration deadline ({fmtDate(event.registrationDeadline)}). Disqualified teams cannot submit projects.
+                  </p>
+                </div>
+              ) : isUpcoming && !mySubmission ? (
                 <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,.02)', borderRadius: '10px', textAlign: 'center' }}>
                   <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '.35rem' }}>🔒</span>
                   <h4 style={{ margin: '0 0 .35rem' }}>Project Submissions Unlock at Kickoff</h4>
@@ -928,11 +1028,21 @@ export const EventDetail = () => {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
                         <h4 style={{ margin: 0, fontSize: '1.15rem' }}>{mySubmission.projectName}</h4>
+                        {mySubmission.teamName && (
+                          <span className="pill" style={{ background: 'rgba(99,102,241,.15)', color: '#818cf8', fontWeight: 700 }}>
+                            👥 Team: {mySubmission.teamName}
+                          </span>
+                        )}
                         <span className="ticket-code-badge">{mySubmission.ticketCode}</span>
                         <span className={`pill ${mySubmission.score !== null ? 'ok' : 'draft'}`}>
                           {mySubmission.score !== null ? 'Evaluated' : 'Submitted'}
                         </span>
                       </div>
+                      {mySubmission.teamName && (
+                        <p style={{ color: 'var(--accent)', fontSize: '.84rem', marginTop: '.35rem' }}>
+                          ⚡ Single submission for Team <strong>{mySubmission.teamName}</strong> • All team members share this project
+                        </p>
+                      )}
                       {mySubmission.tagline && <p style={{ color: 'var(--muted)', fontSize: '.88rem', marginTop: '.25rem' }}>{mySubmission.tagline}</p>}
                     </div>
 
@@ -972,7 +1082,9 @@ export const EventDetail = () => {
               ) : (
                 <form className="form" onSubmit={handleProjectSubmit}>
                   <div className="row spread" style={{ background: 'rgba(255,255,255,.03)', padding: '.75rem', borderRadius: '8px' }}>
-                    <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Submitting as: <strong>{user?.name}</strong></span>
+                    <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>
+                      Submitting as: <strong>{user?.name}</strong> {myRegistration.teamName ? `(Team: ${myRegistration.teamName})` : ''}
+                    </span>
                     <span className="ticket-code-badge">Ticket: {myRegistration.ticketCode}</span>
                   </div>
 

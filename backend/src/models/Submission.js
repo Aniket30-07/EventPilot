@@ -14,6 +14,17 @@ const submissionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    captainRegistrationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Registration',
+      default: null,
+      index: true,
+    },
+    teamName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     ticketCode: {
       type: String,
       required: true,
@@ -81,8 +92,9 @@ const submissionSchema = new mongoose.Schema(
   }
 );
 
-// One submission per participant per hackathon
-submissionSchema.index({ eventId: 1, participantId: 1 }, { unique: true });
+// One submission per team or participant per hackathon
+submissionSchema.index({ eventId: 1, captainRegistrationId: 1 }, { unique: true, sparse: true });
+submissionSchema.index({ eventId: 1, participantId: 1 });
 
 const Submission = mongoose.model('Submission', submissionSchema);
 

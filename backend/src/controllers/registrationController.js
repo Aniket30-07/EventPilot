@@ -26,11 +26,28 @@ export const registerForEvent = async (req, res, next) => {
     }
 
     if ((await Registration.countDocuments({ eventId: event._id, status: 'confirmed', roleInTeam: { $ne: 'player' } })) >= event.capacity) {
-      return fail(res, 400, 'This event is full.');
+      return fail(res, 400, 'This event is full. No seats available.');
     }
 
     const { teamName, squadSize, playerNotes } = req.body || {};
+    const isTeamHackathon = event.category === 'hackathon' && event.hackathonConfig?.teamMode !== 'solo';
     const isTeamSport = event.category === 'sports' && Boolean((teamName || '').trim());
+    const isTeamEvent = isTeamSport || (isTeamHackathon && Boolean((teamName || '').trim()));
+
+    if (isTeamHackathon && (!teamName || !teamName.trim())) {
+      return fail(res, 400, 'Team name is required to register a team for this hackathon.');
+    }
+
+    if (teamName && teamName.trim()) {
+      const duplicateTeam = await Registration.findOne({
+        eventId: event._id,
+        status: 'confirmed',
+        teamName: { $regex: new RegExp(`^${teamName.trim()}$`, 'i') },
+      });
+      if (duplicateTeam) {
+        return fail(res, 400, `Team name "${teamName.trim()}" is already registered. Please choose another name.`);
+      }
+    }
 
     let registration;
     for (let attempt = 0; attempt < 3 && !registration; attempt++) {
@@ -41,10 +58,10 @@ export const registerForEvent = async (req, res, next) => {
           ticketCode: generateTicketCode(event.category),
           registeredAt: now,
           teamName: (teamName || '').trim(),
-          squadSize: Number(squadSize) || 1,
+          squadSize: Number(squadSize) || (isTeamHackathon ? (event.hackathonConfig?.teamSize || event.hackathonConfig?.requiredMembers || 4) : 1),
           playerNotes: (playerNotes || '').trim(),
-          isCaptain: isTeamSport,
-          roleInTeam: isTeamSport ? 'captain' : 'solo',
+          isCaptain: isTeamEvent,
+          roleInTeam: isTeamEvent ? 'captain' : 'solo',
         });
       } catch (err) {
         // Retry only if the random ticket code collided; any other duplicate is handled below.
@@ -60,7 +77,7 @@ export const registerForEvent = async (req, res, next) => {
     });
     if (position > event.capacity) {
       await Registration.deleteOne({ _id: registration._id });
-      return fail(res, 400, 'This event is full.');
+      return fail(res, 400, 'This event is full. No seats available.');
     }
 
     res.status(201).json({ success: true, message: 'Registration confirmed!', registration });
